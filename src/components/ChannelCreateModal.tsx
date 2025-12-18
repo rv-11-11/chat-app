@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, Modal, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { ActivityIndicator, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { channelApi } from '../services/api/channel';
 
 interface Props { visible: boolean; onClose: () => void }

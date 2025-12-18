@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import "../../global.css";
-import { channelApi } from '../../src/services/api/channel';
 import ChannelCreateModal from '../../src/components/ChannelCreateModal';
+import { channelApi } from '../../src/services/api/channel';
 import { useThemeColors } from '../../src/utils/theme';
 
 export default function ChannelListScreen() {

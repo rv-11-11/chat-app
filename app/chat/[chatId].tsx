@@ -1,13 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import GroupDetailsModal from '../../src/components/GroupDetailsModal';
-import { useChatStore } from '../../src/store/chatStore';
 import { useSocket } from '../../src/hooks/useSocket';
 import { useAuthStore } from '../../src/store/authStore';
+import { useChatStore } from '../../src/store/chatStore';
 import { useSocketStore } from '../../src/store/socketStore';
-import { formatMessageTime, getOtherUserAndGroup } from '../../src/utils/helpers';
 import type { Message } from '../../src/types/chat.types';
+import { formatMessageTime, getOtherUserAndGroup } from '../../src/utils/helpers';
 import { useThemeColors } from '../../src/utils/theme';
 
 export default function ChatScreen() {

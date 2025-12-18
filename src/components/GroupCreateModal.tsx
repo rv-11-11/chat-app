@@ -1,9 +1,9 @@
+import * as ImagePicker from 'expo-image-picker';
 import React, { useEffect, useState } from 'react';
-import { View, Text, Modal, TextInput, TouchableOpacity, FlatList, StyleSheet, Image, ActivityIndicator, ScrollView, Alert, Picker } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Image, Modal, Picker, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { userApi } from '../services/api/user';
 import { useChatStore } from '../store/chatStore';
 import type { User } from '../types/auth.types';
-import * as ImagePicker from 'expo-image-picker';
 
 interface Props {
   visible: boolean;

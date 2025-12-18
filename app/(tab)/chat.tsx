@@ -1,13 +1,13 @@
-import { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useChatStore } from '../../src/store/chatStore';
-import { useSocket } from '../../src/hooks/useSocket';
-import { useSocketStore } from '../../src/store/socketStore';
-import { useAuthStore } from '../../src/store/authStore';
-import { formatChatTime, getOtherUserAndGroup } from '../../src/utils/helpers';
-import type { Chat, Message } from '../../src/types/chat.types';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import NewChatModal from '../../src/components/NewChatModal';
+import { useSocket } from '../../src/hooks/useSocket';
+import { useAuthStore } from '../../src/store/authStore';
+import { useChatStore } from '../../src/store/chatStore';
+import { useSocketStore } from '../../src/store/socketStore';
+import type { Chat, Message } from '../../src/types/chat.types';
+import { formatChatTime, getOtherUserAndGroup } from '../../src/utils/helpers';
 import { useThemeColors } from '../../src/utils/theme';
 
 export default function ChatListScreen() {

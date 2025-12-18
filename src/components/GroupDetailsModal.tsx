@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { View, Text, Modal, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, TextInput, Alert, Share } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Modal, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { ENV } from '../config/env';
-import type { Chat } from '../types/chat.types';
-import { useChatStore } from '../store/chatStore';
-import { useAuthStore } from '../store/authStore';
-import { userApi } from '../services/api/user';
 import { chatApi } from '../services/api/chat';
+import { userApi } from '../services/api/user';
+import { useAuthStore } from '../store/authStore';
+import { useChatStore } from '../store/chatStore';
 import type { User } from '../types/auth.types';
+import type { Chat } from '../types/chat.types';
 
 interface Props {
   visible: boolean;

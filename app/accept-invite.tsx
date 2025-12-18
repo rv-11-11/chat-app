@@ -1,10 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import apiClient from '../src/services/api/client';
-import { chatApi } from '../src/services/api/chat';
-import { useAuthStore } from '../src/store/authStore';
 import { secureStorage } from '../src/services/storage/secureStore';
+import { useAuthStore } from '../src/store/authStore';
 import { useThemeColors } from '../src/utils/theme';
 
 export default function AcceptInviteScreen() {

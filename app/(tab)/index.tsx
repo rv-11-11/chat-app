@@ -1,4 +1,4 @@
-import { Text, View, StyleSheet } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import "../../global.css";
 import { useThemeColors } from '../../src/utils/theme';
 

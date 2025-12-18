@@ -1,8 +1,7 @@
 import passport from "passport";
-import { Strategy as JwtStrategy, ExtractJwt } from "passport-jwt";
-import { UnauthorizedException } from "../services/utils/app-error";
-import { Env } from "./env.config";
+import { ExtractJwt, Strategy as JwtStrategy } from "passport-jwt";
 import { findByIdUserService } from "../services/user.service";
+import { Env } from "./env.config";
 
 passport.use(
   new JwtStrategy(

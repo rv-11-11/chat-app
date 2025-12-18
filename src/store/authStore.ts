@@ -1,10 +1,10 @@
 import { create } from 'zustand';
 import { authApi } from '../services/api/auth';
-import type { User, RegisterData, LoginData } from '../types/auth.types';
-import { secureStorage } from '../services/storage/secureStore';
-import { chatApi } from '../services/api/chat';
 import { channelApi } from '../services/api/channel';
+import { chatApi } from '../services/api/chat';
 import { connectSocket, disconnectSocket } from '../services/socket/socketClient';
+import { secureStorage } from '../services/storage/secureStore';
+import type { LoginData, RegisterData, User } from '../types/auth.types';
 
 interface AuthState {
   user: User | null;

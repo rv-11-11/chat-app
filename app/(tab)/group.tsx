@@ -1,11 +1,11 @@
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import "../../global.css";
-import { useChatStore } from '../../src/store/chatStore';
+import GroupCreateModal from '../../src/components/GroupCreateModal';
 import { chatApi } from '../../src/services/api/chat';
 import { useAuthStore } from '../../src/store/authStore';
-import GroupCreateModal from '../../src/components/GroupCreateModal';
-import { useRouter } from 'expo-router';
+import { useChatStore } from '../../src/store/chatStore';
 import { useThemeColors } from '../../src/utils/theme';
 
 export default function GroupListScreen() {
