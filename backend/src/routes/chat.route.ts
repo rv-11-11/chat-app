@@ -8,6 +8,7 @@ import {
   addMemberToChatController,
   removeMemberFromChatController,
   promoteToGroupAdminController,
+  demoteFromAdminController,
   deleteChatController,
   updateChatController,
   inviteUserToChatController,
@@ -31,6 +32,7 @@ chatRoutes
   .post("/:id/add-member", addMemberToChatController)
   .post("/:id/remove-member", removeMemberFromChatController)
   .post("/:id/promote-member", promoteToGroupAdminController)
+  .post("/:id/demote-member", demoteFromAdminController)
   .post("/:id/invite-user", inviteUserToChatController)
   .post("/:id/join-by-invite", autoJoinChatByInviteController)
   .delete("/:id", deleteChatController)

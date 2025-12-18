@@ -11,6 +11,10 @@ export type ChatType = {
   createdBy: string;
   groupName?: string;
   groupUsername?: string;
+  groupDescription?: string;
+  groupRules?: string;
+  groupTopic?: string;
+  groupCategory?: string;
   icon?: string;
   admins?: string[] | UserType[];
   unreadCount?: number;
@@ -47,7 +51,14 @@ export type CreateChatType = {
   isGroup?: boolean;
   participants?: string[];
   groupName?: string;
+  groupDescription?: string;
+  groupUsername?: string;
+  groupRules?: string;
+  groupTopic?: string;
+  groupCategory?: string;
   icon?: string;
+  isPublic?: boolean;
+  allowInviteLinkJoin?: boolean;
 };
 
 export type CreateMessageType = {

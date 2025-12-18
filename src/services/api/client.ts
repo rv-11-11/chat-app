@@ -1,20 +1,31 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { ENV } from '../../config/env';
-import * as SecureStore from 'expo-secure-store';
+import { secureStorage } from '../storage/secureStore';
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL: `${ENV.API_URL}/api`,
-  withCredentials: true, // Important for cookie-based auth
+  withCredentials: true, // keep for web compatibility
   headers: {
     'Content-Type': 'application/json',
   },
   timeout: 30000,
 });
 
-// Request interceptor
+// Request interceptor - attach Bearer token if present (for native builds)
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
-    // Token is handled via cookies, but we can add custom headers if needed
+    try {
+      const token = await secureStorage.get('authToken');
+      if (token) {
+        config.headers = config.headers || {};
+        // Only set Authorization if not already provided
+        if (!('authorization' in (config.headers as any))) {
+          (config.headers as any).Authorization = `Bearer ${token}`;
+        }
+      }
+    } catch (err) {
+      // ignore
+    }
     return config;
   },
   (error) => {
@@ -27,9 +38,8 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response?.status === 401) {
-      // Unauthorized - clear auth and redirect to login
-      await SecureStore.deleteItemAsync('authToken').catch(() => {});
-      // Navigation will be handled by auth hook
+      // Unauthorized - clear auth token
+      await secureStorage.remove('authToken').catch(() => {});
     }
     return Promise.reject(error);
   }

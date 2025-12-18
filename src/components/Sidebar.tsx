@@ -102,18 +102,22 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
             style={[styles.sidebar, { backgroundColor: sidebarBg }]}
             onPress={(e) => e.stopPropagation()}
           >
+            <View style={styles.closeButtonContainer}>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={onClose}
+                activeOpacity={0.7}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <FontAwesome name="times" size={20} color={sidebarForeground} />
+              </TouchableOpacity>
+            </View>
+
             <ScrollView
               style={styles.scrollView}
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
             >
-              {/* Close Button */}
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={onClose}
-              >
-                <FontAwesome name="times" size={20} color={sidebarForeground} />
-              </TouchableOpacity>
 
               {/* User Profile Section */}
               <Pressable
@@ -258,14 +262,18 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingTop: 24,
     paddingBottom: 16,
     paddingHorizontal: 16,
   },
+  closeButtonContainer: {
+    alignItems: 'flex-end',
+    paddingTop: 16,
+    paddingRight: 16,
+    paddingBottom: 8,
+  },
   closeButton: {
-    alignSelf: 'flex-end',
     padding: 8,
-    marginBottom: 8,
+    borderRadius: 8,
   },
   profileSection: {
     marginBottom: 24,

@@ -1,10 +1,13 @@
-import { Text, View } from 'react-native';
+import { Text, View, StyleSheet } from 'react-native';
 import "../../global.css";
+import { useThemeColors } from '../../src/utils/theme';
 
 const Community = () => {
+  const colors = useThemeColors();
+  const styles = StyleSheet.create({ container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }, title: { fontSize: 22, fontWeight: '700', color: colors.foreground } });
   return (
-    <View className="flex-1 justify-center items-center bg-white">
-      <Text className="text-2xl font-bold">Community Screen</Text>
+    <View style={styles.container}>
+      <Text style={styles.title}>Community Screen</Text>
     </View>
   );
 }

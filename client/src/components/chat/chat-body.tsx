@@ -1,15 +1,16 @@
 import { useChat } from "@/hooks/use-chat";
 import { useSocket } from "@/hooks/use-socket";
 import type { MessageType, ChatType } from "@/types/chat.type";
-import { useEffect, useRef } from "react";
+import type { UserType } from "@/types/auth.type";
+import { useEffect, useRef, useState } from "react";
 import ChatBodyMessage from "./chat-body-message";
+import TypingIndicator from "./typing-indicator";
 
 interface Props {
   chatId: string | null;
   messages: MessageType[];
   onReply: (message: MessageType) => void;
   chat?: ChatType | null;
-  // when true, system messages will be omitted from rendering
   hideSystemMessages?: boolean;
   forwardMode?: boolean;
   selectedMessageIds?: Set<string>;
@@ -19,6 +20,8 @@ const ChatBody = ({ chatId, messages, onReply, chat, hideSystemMessages = false,
   const { socket } = useSocket();
   const { addNewMessage, removeMessage } = useChat();
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const [typingUsers, setTypingUsers] = useState<UserType[]>([]);
+  const typingTimeoutRef = useRef<Record<string, NodeJS.Timeout>>({});
 
   useEffect(() => {
     if (!chatId) return;
@@ -31,12 +34,32 @@ const ChatBody = ({ chatId, messages, onReply, chat, hideSystemMessages = false,
       }
     };
 
+    const handleUserTyping = (data: { user: UserType; chatId: string }) => {
+      if (data.chatId !== chatId) return;
+
+      setTypingUsers((prev) => {
+        const filtered = prev.filter((u) => u._id !== data.user._id);
+        return [...filtered, data.user];
+      });
+
+      if (typingTimeoutRef.current[data.user._id]) {
+        clearTimeout(typingTimeoutRef.current[data.user._id]);
+      }
+
+      typingTimeoutRef.current[data.user._id] = setTimeout(() => {
+        setTypingUsers((prev) => prev.filter((u) => u._id !== data.user._id));
+        delete typingTimeoutRef.current[data.user._id];
+      }, 3000);
+    };
+
     socket.on("message:new", handleNewMessage);
     socket.on("message:deleted", handleDeletedMessage);
+    socket.on("user:typing", handleUserTyping);
     
     return () => {
       socket.off("message:new", handleNewMessage);
       socket.off("message:deleted", handleDeletedMessage);
+      socket.off("user:typing", handleUserTyping);
     };
   }, [socket, chatId, addNewMessage, removeMessage]);
 
@@ -50,7 +73,6 @@ const ChatBody = ({ chatId, messages, onReply, chat, hideSystemMessages = false,
   return (
     <div className="w-full flex flex-col px-4 py-2 overflow-x-hidden">
       {messages.map((message) => {
-        // Render system messages unless explicitly hidden
         if (!hideSystemMessages && message.messageType === "SYSTEM") {
           return (
             <div
@@ -64,7 +86,6 @@ const ChatBody = ({ chatId, messages, onReply, chat, hideSystemMessages = false,
           );
         }
 
-        // Filter out messages without valid sender for regular messages
         if (!message.sender || !message.sender._id) {
           return null;
         }
@@ -82,6 +103,7 @@ const ChatBody = ({ chatId, messages, onReply, chat, hideSystemMessages = false,
           </div>
         );
       })}
+      <TypingIndicator typingUsers={typingUsers} />
       <div ref={bottomRef} />
     </div>
   );

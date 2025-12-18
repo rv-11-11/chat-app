@@ -50,23 +50,26 @@ export default function MyProfileScreen() {
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={styles.contentContainer}
+      scrollEnabled={true}
     >
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => {
-            // Navigate back to main screen
             try {
               navigation.goBack();
-            } catch (error) {
-              // Fallback: navigate to drawer index which redirects to tabs
-              router.replace('/(drawer)/index');
+            } catch {
+              router.replace('/(tab)/chat');
             }
           }}
           style={[styles.closeButton, { backgroundColor: colors.muted }]}
+          activeOpacity={0.7}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <FontAwesome name="times" size={20} color={colors.foreground} />
         </TouchableOpacity>
+
+
         <Text style={[styles.title, { color: colors.foreground }]}>My Profile</Text>
         <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
           View and manage your profile information
@@ -220,11 +223,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
     top: 0,
-    width: 40,
-    height: 40,
+    width: 48,
+    height: 48,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 100,
   },
   title: {
     fontSize: 32,

@@ -1,6 +1,10 @@
 import { create } from 'zustand';
 import { authApi } from '../services/api/auth';
 import type { User, RegisterData, LoginData } from '../types/auth.types';
+import { secureStorage } from '../services/storage/secureStore';
+import { chatApi } from '../services/api/chat';
+import { channelApi } from '../services/api/channel';
+import { connectSocket, disconnectSocket } from '../services/socket/socketClient';
 
 interface AuthState {
   user: User | null;
@@ -27,6 +31,14 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const response = await authApi.register(data);
       set({ user: response.user });
+      // Persist token if backend returned one
+      if ((response as any).token) {
+        await secureStorage.set('authToken', (response as any).token).catch(() => {});
+      }
+      // connect socket after successful auth
+      try { connectSocket(); } catch (e) {}
+      // process any pending invite stored before auth
+      try { await processPendingInvite(); } catch (e) {}
       // Socket will be connected via useEffect in root layout
     } catch (error: any) {
       throw error;
@@ -40,6 +52,11 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const response = await authApi.login(data);
       set({ user: response.user });
+      if ((response as any).token) {
+        await secureStorage.set('authToken', (response as any).token).catch(() => {});
+      }
+      try { connectSocket(); } catch (e) {}
+      try { await processPendingInvite(); } catch (e) {}
       // Socket will be connected via useEffect in root layout
     } catch (error: any) {
       throw error;
@@ -52,8 +69,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       await authApi.logout();
       set({ user: null });
-      const { disconnectSocket } = await import('../services/socket/socketClient');
-      disconnectSocket();
+      await secureStorage.remove('authToken').catch(() => {});
+      try { disconnectSocket(); } catch (e) {}
     } catch (error: any) {
       throw error;
     }
@@ -64,6 +81,12 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const response = await authApi.getStatus();
       set({ user: response.user });
+      // if backend provided token, persist it
+      if ((response as any).token) {
+        await secureStorage.set('authToken', (response as any).token).catch(() => {});
+      }
+      try { connectSocket(); } catch (e) {}
+      try { await processPendingInvite(); } catch (e) {}
       // Socket will be connected via useEffect in root layout
     } catch (error) {
       set({ user: null });
@@ -76,4 +99,46 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user });
   },
 }));
+
+// Process pending invite saved before authentication (web fallback behavior)
+const processPendingInvite = async () => {
+  try {
+    const pending = await secureStorage.get('pendingInvite');
+    if (!pending) return;
+    let obj: { type: 'group' | 'channel' | 'community'; id: string } | null = null;
+    try { obj = JSON.parse(pending); } catch { obj = null; }
+    if (!obj) {
+      await secureStorage.remove('pendingInvite');
+      return;
+    }
+
+    if (obj.type === 'group') {
+      try {
+        await chatApi.addMember(obj.id, useAuthStore.getState().user?._id || '');
+        await secureStorage.remove('pendingInvite');
+        return;
+      } catch (err: any) {
+        if (err?.response?.status === 401) {
+          // server might not have set session cookie yet; try a retry after delay
+          await new Promise((r) => setTimeout(r, 500));
+          try { await chatApi.addMember(obj.id, useAuthStore.getState().user?._id || ''); await secureStorage.remove('pendingInvite'); return; } catch { /* ignore */ }
+        }
+      }
+    } else if (obj.type === 'channel') {
+      try {
+        await channelApi.subscribe(obj.id);
+        await secureStorage.remove('pendingInvite');
+        return;
+      } catch (err: any) {
+        if (err?.response?.status === 401) {
+          await new Promise((r) => setTimeout(r, 500));
+          try { await channelApi.subscribe(obj.id); await secureStorage.remove('pendingInvite'); return; } catch { /* ignore */ }
+        }
+      }
+    }
+    // community invite handling can be added here when API client exists
+  } catch (e) {
+    // ignore
+  }
+};
 

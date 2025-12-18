@@ -7,12 +7,17 @@ import { findByIdUserService } from "../services/user.service";
 passport.use(
   new JwtStrategy(
     {
+      // Accept token from cookie OR Authorization header (Bearer)
       jwtFromRequest: ExtractJwt.fromExtractors([
         (req) => {
-          const token = req.cookies.accessToken;
-          if (!token) throw new UnauthorizedException("Unauthorized access");
-          return token;
+          // prefer cookie for web
+          try {
+            const token = req?.cookies?.accessToken;
+            if (token) return token;
+          } catch (e) {}
+          return null;
         },
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
       ]),
       secretOrKey: Env.JWT_SECRET,
       audience: ["user"],

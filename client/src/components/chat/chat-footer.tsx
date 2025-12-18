@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { MessageType } from "@/types/chat.type";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -11,6 +11,7 @@ import { Input } from "../ui/input";
 import ChatReplyBar from "./chat-reply-bar";
 import { useChat } from "@/hooks/use-chat";
 import { useNSFWDetection } from "@/hooks/use-nsfw-detection";
+import { useSocket } from "@/hooks/use-socket";
 
 interface Props {
   chatId: string | null;
@@ -30,15 +31,17 @@ const ChatFooter = ({
 
   const { sendMessage, isSendingMsg } = useChat();
   const { isChecking: isCheckingNSFW, checkImage, lastPredictions } = useNSFWDetection();
+  const { socket } = useSocket();
 
   const [image, setImage] = useState<string | null>(null);
   const [video, setVideo] = useState<{
-    data: string; // base64
+    data: string; 
     name: string;
     type: string;
     size: number;
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const form = useForm({
     resolver: zodResolver(messageSchema),
@@ -112,6 +115,20 @@ const ChatFooter = ({
   if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const handleTyping = (value: string) => {
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    if (socket && chatId && value.trim()) {
+      socket.emit("user:typing", { chatId, userId: currentUserId });
+    }
+
+    typingTimeoutRef.current = setTimeout(() => {
+      typingTimeoutRef.current = null;
+    }, 1000);
+  };
+
   const onSubmit = (values: { message?: string }) => {
     if (isSendingMsg || isCheckingNSFW) return;
     if (!values.message?.trim() && !image && !video) {
@@ -138,10 +155,7 @@ const ChatFooter = ({
   return (
     <>
       <div
-        className="sticky bottom-0
-       inset-x-0 z-40
-       bg-card border-t border-border py-3 mb-16
-      "
+        className="sticky bottom-0 inset-x-0 z-40 bg-card/95 backdrop-blur border-t border-border/40 py-4 mb-16 shadow-lg"
       >
         {/* NSFW Checking Indicator */}
         {isCheckingNSFW && (
@@ -237,9 +251,13 @@ const ChatFooter = ({
                 <FormItem className="flex-1">
                   <Input
                     {...field}
+                    onChange={(e) => {
+                      field.onChange(e);
+                      handleTyping(e.target.value);
+                    }}
                     autoComplete="off"
-                    placeholder="Type new message"
-                    className="min-h-[40px] bg-background"
+                    placeholder="Type new message..."
+                    className="min-h-[44px] bg-input border-border/50 rounded-xl focus:border-primary/60 transition-all duration-200"
                   />
                 </FormItem>
               )}
@@ -248,10 +266,10 @@ const ChatFooter = ({
             <Button
               type="submit"
               size="icon"
-              className="rounded-lg"
+              className="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground shadow-md hover:shadow-lg transition-all duration-200"
               disabled={isSendingMsg || isCheckingNSFW}
             >
-              <Send className="h-3.5 w-3.5" />
+              <Send className="h-4 w-4" />
             </Button>
           </form>
         </Form>

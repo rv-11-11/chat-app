@@ -10,6 +10,7 @@ import {
   addMemberToChatService,
   removeMemberFromChatService,
   promoteToGroupAdminService,
+  demoteFromAdminService,
   deleteChatService,
   updateChatService,
   inviteUserToChatService,
@@ -125,6 +126,21 @@ export const promoteToGroupAdminController = asyncHandler(
   }
 );
 
+export const demoteFromAdminController = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = req.user?._id;
+    const { id } = chatIdSchema.parse(req.params);
+    const { userId: memberId } = req.body;
+
+    const chat = await demoteFromAdminService(id, memberId, userId);
+
+    return res.status(HTTPSTATUS.OK).json({
+      message: "Member removed from admin role",
+      chat,
+    });
+  }
+);
+
 export const deleteChatController = asyncHandler(
   async (req: Request, res: Response) => {
     const userId = req.user?._id;
@@ -142,10 +158,18 @@ export const updateChatController = asyncHandler(
   async (req: Request, res: Response) => {
     const userId = req.user?._id;
     const { id } = chatIdSchema.parse(req.params);
-    const { groupName, icon, channelDescription, isPublic, allowInviteLinkJoin } = req.body;
+    const { 
+      groupName, icon, channelDescription, isPublic, allowInviteLinkJoin,
+      groupDescription, groupUsername, groupRules, groupTopic, groupCategory 
+    } = req.body;
 
     const chat = await updateChatService(id, userId, {
       groupName,
+      groupDescription,
+      groupUsername,
+      groupRules,
+      groupTopic,
+      groupCategory,
       icon,
       channelDescription,
       isPublic,

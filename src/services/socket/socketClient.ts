@@ -1,5 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import { ENV } from '../../config/env';
+import { secureStorage } from '../storage/secureStore';
 
 let socket: Socket | null = null;
 
@@ -8,26 +9,35 @@ export const getSocket = (): Socket | null => {
 };
 
 export const connectSocket = (): Socket => {
-  if (socket?.connected) {
-    return socket;
-  }
+  if (socket && socket.connected) return socket;
 
-  // Disconnect existing socket if any
+  // If there's an existing socket, disconnect it first
   if (socket) {
-    socket.disconnect();
+    try {
+      socket.removeAllListeners();
+      socket.disconnect();
+    } catch (e) {
+      // ignore
+    }
+    socket = null;
   }
 
-  socket = io(ENV.SOCKET_URL, {
+  // Create socket synchronously but do not auto connect until we attach auth
+  const options: any = {
     path: '/socket.io/',
     transports: ['polling', 'websocket'],
+    autoConnect: false,
     withCredentials: true,
-    autoConnect: true,
     reconnection: true,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
     reconnectionAttempts: 5,
-  });
+    auth: {},
+  };
 
+  socket = io(ENV.SOCKET_URL, options);
+
+  // Attach basic listeners immediately
   socket.on('connect', () => {
     console.log('Socket connected:', socket?.id);
   });
@@ -37,19 +47,45 @@ export const connectSocket = (): Socket => {
   });
 
   socket.on('connect_error', (error) => {
-    console.error('Socket connection error:', error.message);
+    console.error('Socket connection error:', error?.message || error);
   });
+
+  // Async: fetch token and then connect
+  (async () => {
+    try {
+      const token = await secureStorage.get('authToken');
+      if (token && socket) {
+        // set auth then connect
+        try {
+          (socket as any).auth = { token };
+        } catch (e) {
+          // ignore
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+    try {
+      socket?.connect();
+    } catch (e) {
+      // ignore
+    }
+  })();
 
   return socket;
 };
 
 export const disconnectSocket = (): void => {
   if (socket) {
-    socket.disconnect();
-    socket.removeAllListeners();
+    try {
+      socket.removeAllListeners();
+      socket.disconnect();
+    } catch (e) {
+      // ignore
+    }
     socket = null;
   }
 };
 
-export default socket;
+export default getSocket;
 

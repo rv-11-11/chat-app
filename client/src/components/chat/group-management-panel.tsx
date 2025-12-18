@@ -69,11 +69,20 @@ export const GroupManagementPanel = memo(
     const handlePromoteToAdmin = async (userId: string) => {
       try {
         await API.post(`/chat/${group._id}/promote-member`, { userId });
-        // Update admin list locally
         setAdmins([...admins, userId]);
         toast.success("Member promoted to admin");
     } catch {
       toast.error("Failed to promote member");
+    }
+    };
+
+    const handleDemoteFromAdmin = async (userId: string) => {
+      try {
+        await API.post(`/chat/${group._id}/demote-member`, { userId });
+        setAdmins(admins.filter(id => id !== userId));
+        toast.success("Member removed from admin role");
+    } catch {
+      toast.error("Failed to demote member");
     }
     };
 
@@ -305,6 +314,7 @@ export const GroupManagementPanel = memo(
           isAdmin={isAdmin}
           onRemoveMember={handleRemoveMember}
           onPromoteToAdmin={handlePromoteToAdmin}
+          onDemoteFromAdmin={handleDemoteFromAdmin}
         />
 
         {/* Delete Group Dialog */}

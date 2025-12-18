@@ -13,6 +13,7 @@ interface ViewMembersDialogProps {
   isAdmin?: boolean;
   onRemoveMember?: (userId: string) => void;
   onPromoteToAdmin?: (userId: string) => void;
+  onDemoteFromAdmin?: (userId: string) => void;
 }
 
 export const ViewMembersDialog = memo(
@@ -25,6 +26,7 @@ export const ViewMembersDialog = memo(
     isAdmin = false,
     onRemoveMember,
     onPromoteToAdmin,
+    onDemoteFromAdmin,
   }: ViewMembersDialogProps) => {
     const { theme } = useTheme();
     const [searchQuery, setSearchQuery] = useState("");
@@ -174,6 +176,10 @@ export const ViewMembersDialog = memo(
             }}
             onPromote={() => {
               onPromoteToAdmin?.(selectedMemberId);
+              setSelectedMemberId(null);
+            }}
+            onDemote={() => {
+              onDemoteFromAdmin?.(selectedMemberId);
               setSelectedMemberId(null);
             }}
             isAdmin={admins.includes(selectedMemberId)}

@@ -43,15 +43,15 @@ const AsideBar = ({ onClose }: Props) => {
           tabIndex={0}
           onClick={onClose}
           onKeyDown={(e) => (e.key === "Escape" ? onClose() : null)}
-          className="fixed inset-y-0 left-80 right-0 bg-black/30 z-[9999] lg:hidden"
+          className="fixed inset-y-0 left-80 right-0 bg-black/40 backdrop-blur-sm z-[9999] lg:hidden transition-colors duration-200"
           aria-hidden="false"
         />
       )}
 
       <aside
-        className="top-0 fixed inset-y-0 left-0 z-[10000000] h-svh shadow-sm w-80 overflow-y-auto bg-sidebar text-sidebar-foreground"
+        className="top-0 fixed inset-y-0 left-0 z-[10000000] h-svh shadow-xl w-80 overflow-y-auto bg-sidebar text-sidebar-foreground border-r border-sidebar-border/40"
       >
-        <div className="w-full h-full px-4 pt-6 pb-6 flex flex-col">
+        <div className="w-full h-full px-5 pt-6 pb-6 flex flex-col">
           {/* User Profile Section */}
           <div className="mb-6 pb-6 flex flex-col items-start border-b border-sidebar-border">
             {onClose && (
@@ -106,9 +106,9 @@ const AsideBar = ({ onClose }: Props) => {
                     item.action();
                     onClose?.();
                   }}
-                  className="w-full flex items-center gap-4 px-4 py-3 rounded-lg transition-colors text-left text-sidebar-foreground hover:bg-sidebar-accent/10"
+                  className="w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200 text-left text-sidebar-foreground hover:bg-sidebar-accent/15 active:scale-95"
                 >
-                  <Icon className="h-6 w-6 flex-shrink-0 text-sidebar-accent-foreground" />
+                  <Icon className="h-5 w-5 flex-shrink-0 text-sidebar-primary" />
                   <span className="font-medium text-base">{item.label}</span>
                 </button>
               );
@@ -116,12 +116,12 @@ const AsideBar = ({ onClose }: Props) => {
           </div>
 
           {/* Theme Toggle */}
-          <div className="mt-auto pt-4 flex items-center justify-between border-t border-sidebar-border">
-            <span className="text-sm text-sidebar-foreground/70">Theme</span>
+          <div className="mt-auto pt-4 flex items-center justify-between border-t border-sidebar-border/50">
+            <span className="text-sm text-sidebar-foreground/70 font-medium">Theme</span>
             <Button
               variant="outline"
               size="icon"
-              className="rounded-full border-sidebar-border bg-sidebar-accent/20 hover:bg-sidebar-accent/30"
+              className="rounded-xl border-sidebar-border/50 bg-sidebar-accent/20 hover:bg-sidebar-accent/30 transition-all duration-200"
               onClick={() => setTheme(theme === "light" ? "dark" : "light")}
             >
               <Sun

@@ -14,3 +14,5 @@ export const useSidebarStore = create<SidebarState>((set) => ({
   toggleSidebar: () => set((state) => ({ isOpen: !state.isOpen })),
 }));
 
+
+

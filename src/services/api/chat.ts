@@ -38,12 +38,17 @@ export const chatApi = {
   },
 
   removeMember: async (chatId: string, memberId: string): Promise<{ chat: Chat }> => {
-    const response = await apiClient.post<{ chat: Chat }>(`/chat/${chatId}/remove-member`, { memberId });
+    const response = await apiClient.post<{ chat: Chat }>(`/chat/${chatId}/remove-member`, { userId: memberId });
     return response.data;
   },
 
   promoteToAdmin: async (chatId: string, userId: string): Promise<{ chat: Chat }> => {
     const response = await apiClient.post<{ chat: Chat }>(`/chat/${chatId}/promote-member`, { userId });
+    return response.data;
+  },
+
+  demoteFromAdmin: async (chatId: string, userId: string): Promise<{ chat: Chat }> => {
+    const response = await apiClient.post<{ chat: Chat }>(`/chat/${chatId}/demote-member`, { userId });
     return response.data;
   },
 

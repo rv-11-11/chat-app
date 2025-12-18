@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { Crown, UserMinus, X } from "lucide-react";
+import { Crown, UserMinus, X, ShieldOff } from "lucide-react";
 import { useTheme } from "../theme-provider";
 import type { UserType } from "@/types/auth.type";
 
@@ -9,6 +9,7 @@ interface MemberActionDialogProps {
   onClose: () => void;
   onRemove: () => void;
   onPromote: () => void;
+  onDemote?: () => void;
   isAdmin?: boolean;
 }
 
@@ -19,6 +20,7 @@ export const MemberActionDialog = memo(
     onClose,
     onRemove,
     onPromote,
+    onDemote,
     isAdmin = false,
   }: MemberActionDialogProps) => {
     const { theme } = useTheme();
@@ -90,6 +92,22 @@ export const MemberActionDialog = memo(
               >
                 <Crown className="h-5 w-5 text-amber-500 flex-shrink-0" />
                 <span className="text-sm">Promote to admin</span>
+              </button>
+            )}
+
+            {isAdmin && onDemote && (
+              <button
+                onClick={onDemote}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg
+                  transition-colors text-left
+                  ${
+                    theme === "dark"
+                      ? "hover:bg-slate-700"
+                      : "hover:bg-gray-100"
+                  }`}
+              >
+                <ShieldOff className="h-5 w-5 text-orange-500 flex-shrink-0" />
+                <span className="text-sm">Remove admin role</span>
               </button>
             )}
 

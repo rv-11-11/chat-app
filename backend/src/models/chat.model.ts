@@ -12,6 +12,11 @@ export interface ChatDocument extends Document {
   type: ChatType;
   isGroup?: boolean; // Deprecated, use type instead
   groupName?: string;
+  groupDescription?: string; // Description for groups
+  groupUsername?: string; // Unique username for groups (e.g., @groupname)
+  groupRules?: string; // Group rules/guidelines
+  groupTopic?: string; // Main topic of the group
+  groupCategory?: string; // Category/type of group (e.g., "study", "gaming", "work", "hobbies")
   channelDescription?: string;
   channelUsername?: string; // Unique username for channels (e.g., @channelname)
   icon?: string;
@@ -51,16 +56,41 @@ const chatSchema = new Schema<ChatDocument>(
     groupName: {
       type: String,
     },
+    groupDescription: {
+      type: String,
+      default: null,
+    },
+    groupUsername: {
+      type: String,
+      unique: true,
+      sparse: true,
+      lowercase: true,
+      trim: true,
+      match: /^[a-z0-9_]+$/,
+    },
+    groupRules: {
+      type: String,
+      default: null,
+    },
+    groupTopic: {
+      type: String,
+      default: null,
+    },
+    groupCategory: {
+      type: String,
+      enum: ["study", "gaming", "work", "hobbies", "sports", "entertainment", "other"],
+      default: "other",
+    },
     channelDescription: {
       type: String,
     },
     channelUsername: {
       type: String,
       unique: true,
-      sparse: true, // Only enforce uniqueness for non-null values
+      sparse: true,
       lowercase: true,
       trim: true,
-      match: /^[a-z0-9_]+$/, // Only lowercase alphanumeric and underscores
+      match: /^[a-z0-9_]+$/,
     },
     icon: {
       type: String,

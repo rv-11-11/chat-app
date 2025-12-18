@@ -17,12 +17,21 @@ export const createChatService = async (
     isGroup?: boolean;
     participants?: string[];
     groupName?: string;
+    groupDescription?: string;
+    groupUsername?: string;
+    groupRules?: string;
+    groupTopic?: string;
+    groupCategory?: string;
     isPublic?: boolean;
     allowInviteLinkJoin?: boolean;
     icon?: string;
   }
 ) => {
-  const { participantId, isGroup, participants, groupName, isPublic, icon, allowInviteLinkJoin } = body;
+  const { 
+    participantId, isGroup, participants, groupName, 
+    groupDescription, groupUsername, groupRules, groupTopic, groupCategory,
+    isPublic, icon, allowInviteLinkJoin 
+  } = body;
 
   let chat;
   let allParticipantIds: string[] = [];
@@ -38,8 +47,6 @@ export const createChatService = async (
         iconUrl = uploadRes.secure_url;
       } catch (error) {
         console.error("Failed to upload icon to Cloudinary:", error);
-        // Continue without icon or throw error depending on requirement. 
-        // For now, we continue but iconUrl remains as passed (if valid url) or null if base64 failed.
       }
     }
 
@@ -48,9 +55,15 @@ export const createChatService = async (
       participants: allParticipantIds,
       isGroup: true,
       groupName,
+      groupDescription,
+      groupUsername: groupUsername?.toLowerCase(),
+      groupRules,
+      groupTopic,
+      groupCategory: groupCategory || "other",
       isPublic: isPublic ?? false,
       icon: iconUrl,
       allowInviteLinkJoin: allowInviteLinkJoin ?? true,
+      admins: [userId],
       createdBy: userId,
     });
   } else if (participantId) {
@@ -331,6 +344,11 @@ export const promoteToGroupAdminService = async (
     throw new ForbiddenException("Only group creator or admins can promote members");
   }
 
+  // Prevent self-promotion
+  if (userId.toString() === memberId.toString()) {
+    throw new ForbiddenException("You cannot promote yourself");
+  }
+
   // Check if member exists
   if (!chat.participants.some((id) => id.toString() === memberId)) {
     throw new BadRequestException("Member not found in group");
@@ -369,6 +387,61 @@ export const promoteToGroupAdminService = async (
   return await chat.populate("participants", "name avatar");
 };
 
+export const demoteFromAdminService = async (
+  chatId: string,
+  memberId: string,
+  userId: string
+) => {
+  const chat = await ChatModel.findById(chatId);
+
+  if (!chat) throw new BadRequestException("Chat not found");
+
+  if (!chat.isGroup) throw new BadRequestException("This is not a group chat");
+
+  const isCreator = chat.createdBy.toString() === userId.toString();
+  const isAdmin = chat.admins.some((id) => id.toString() === userId.toString());
+  
+  if (!isCreator && !isAdmin) {
+    throw new ForbiddenException("Only group creator or admins can demote members");
+  }
+
+  // Prevent self-demotion
+  if (userId.toString() === memberId.toString()) {
+    throw new ForbiddenException("You cannot demote yourself");
+  }
+
+  if (!chat.participants.some((id) => id.toString() === memberId)) {
+    throw new BadRequestException("Member not found in group");
+  }
+
+  if (!chat.admins.some((id) => id.toString() === memberId)) {
+    throw new BadRequestException("Member is not an admin");
+  }
+
+  const adminIndex = chat.admins.findIndex((id) => id.toString() === memberId);
+  chat.admins.splice(adminIndex, 1);
+  
+  const demotedUser = await UserModel.findById(memberId);
+  const demoter = await UserModel.findById(userId);
+  
+  await chat.save();
+
+  const systemMessage = await MessageModel.create({
+    chatId,
+    content: `${demoter?.name || "Admin"} removed ${demotedUser?.name || "User"} from admin role`,
+    messageType: "SYSTEM",
+  });
+
+  chat.lastMessage = systemMessage._id as mongoose.Types.ObjectId;
+  await chat.save();
+
+  emitNewMessageToChatRoom(userId, chatId, systemMessage, {
+    includeSender: true,
+  });
+
+  return await chat.populate("participants", "name avatar");
+};
+
 export const deleteChatService = async (chatId: string, userId: string) => {
   const chat = await ChatModel.findById(chatId);
 
@@ -396,6 +469,11 @@ export const updateChatService = async (
   userId: string,
   data: {
     groupName?: string;
+    groupDescription?: string;
+    groupUsername?: string;
+    groupRules?: string;
+    groupTopic?: string;
+    groupCategory?: string;
     icon?: string;
     channelDescription?: string;
     isPublic?: boolean;
@@ -406,7 +484,6 @@ export const updateChatService = async (
 
   if (!chat) throw new BadRequestException("Chat not found");
 
-  // Verify user is admin or creator
   const isCreator = chat.createdBy.toString() === userId.toString();
   const isAdmin = chat.admins.some((id) => id.toString() === userId.toString());
 
@@ -415,7 +492,6 @@ export const updateChatService = async (
   }
 
   if (data.icon && data.icon !== chat.icon) {
-    // If icon is updated and it looks like base64 or different from current
     try {
       const uploadRes = await cloudinary.uploader.upload(data.icon, {
         resource_type: "auto",
@@ -428,6 +504,11 @@ export const updateChatService = async (
   }
 
   if (data.groupName !== undefined) chat.groupName = data.groupName;
+  if (data.groupDescription !== undefined) chat.groupDescription = data.groupDescription;
+  if (data.groupUsername !== undefined) chat.groupUsername = data.groupUsername?.toLowerCase();
+  if (data.groupRules !== undefined) chat.groupRules = data.groupRules;
+  if (data.groupTopic !== undefined) chat.groupTopic = data.groupTopic;
+  if (data.groupCategory !== undefined) chat.groupCategory = data.groupCategory;
   if (data.icon !== undefined) chat.icon = data.icon;
   if (data.channelDescription !== undefined)
     chat.channelDescription = data.channelDescription;

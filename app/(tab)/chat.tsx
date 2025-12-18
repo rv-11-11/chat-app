@@ -8,6 +8,7 @@ import { useAuthStore } from '../../src/store/authStore';
 import { formatChatTime, getOtherUserAndGroup } from '../../src/utils/helpers';
 import type { Chat, Message } from '../../src/types/chat.types';
 import NewChatModal from '../../src/components/NewChatModal';
+import { useThemeColors } from '../../src/utils/theme';
 
 export default function ChatListScreen() {
   const { chats, fetchChats, isChatsLoading, addNewMessage, updateChatLastMessage, updateChatUnread, addNewChat } = useChatStore();
@@ -16,6 +17,49 @@ export default function ChatListScreen() {
   const router = useRouter();
   const [isNewChatModalVisible, setIsNewChatModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const colors = useThemeColors();
+
+  const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 18,
+      paddingVertical: 14,
+      borderBottomWidth: 0.5,
+      borderBottomColor: colors.border,
+      backgroundColor: colors.card,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.1,
+      shadowRadius: 10,
+      elevation: 4,
+    },
+    headerTitle: { fontSize: 32, fontWeight: '800', color: colors.foreground, letterSpacing: -0.5 },
+    newChatButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 10, elevation: 6 },
+    newChatButtonText: { color: colors.primaryForeground, fontSize: 26, fontWeight: '800', lineHeight: 26 },
+    searchContainer: { paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: colors.border, backgroundColor: colors.background },
+    searchInput: { backgroundColor: colors.muted, borderRadius: 16, paddingHorizontal: 16, paddingVertical: 13, fontSize: 16, color: colors.foreground, borderWidth: 1, borderColor: colors.border },
+    listContent: { paddingVertical: 8, paddingHorizontal: 12 },
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+    loadingText: { marginTop: 12, fontSize: 16, color: colors.mutedForeground, fontWeight: '500' },
+    chatItem: { flexDirection: 'row', padding: 14, marginVertical: 6, borderRadius: 18, backgroundColor: colors.card, marginHorizontal: 6, borderWidth: 0.8, borderColor: colors.border, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6, elevation: 3 },
+    avatarContainer: { position: 'relative', marginRight: 13 },
+    avatar: { width: 54, height: 54, borderRadius: 27, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
+    avatarText: { color: colors.primaryForeground, fontSize: 22, fontWeight: '800' },
+    onlineBadge: { position: 'absolute', bottom: 0, right: 0, width: 17, height: 17, borderRadius: 8.5, backgroundColor: '#10b981', borderWidth: 3, borderColor: colors.card, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.25, shadowRadius: 3, elevation: 4 },
+    chatContent: { flex: 1, justifyContent: 'center' },
+    chatHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 },
+    chatName: { fontSize: 17, fontWeight: '800', color: colors.foreground, flex: 1, letterSpacing: -0.3 },
+    chatTime: { fontSize: 12, color: colors.mutedForeground, marginLeft: 8, fontWeight: '600' },
+    chatFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    lastMessage: { fontSize: 14, color: colors.mutedForeground, flex: 1, fontWeight: '400' },
+    unreadBadge: { backgroundColor: colors.primary, borderRadius: 13, minWidth: 24, height: 24, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8, marginLeft: 10, shadowColor: colors.primary, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.35, shadowRadius: 5, elevation: 3 },
+    unreadBadgeText: { color: colors.primaryForeground, fontSize: 11, fontWeight: '800' },
+    emptyText: { fontSize: 20, fontWeight: '800', color: colors.mutedForeground, marginBottom: 10 },
+    emptySubtext: { fontSize: 15, color: colors.mutedForeground, textAlign: 'center', fontWeight: '500', lineHeight: 22 },
+  });
 
   useEffect(() => {
     fetchChats();
@@ -50,7 +94,9 @@ export default function ChatListScreen() {
   });
 
   // Filter chats based on search
-  const filteredChats = chats
+  const nonNullChats = chats.filter((c): c is Chat => !!c);
+
+  const filteredChats = nonNullChats
     .filter((chat) => {
       if (!searchQuery.trim()) return true;
       const { name } = getOtherUserAndGroup(chat, user?._id || null, onlineUsers);
@@ -62,7 +108,7 @@ export default function ChatListScreen() {
       const timeB = b.lastMessage?.createdAt ? new Date(b.lastMessage.createdAt).getTime() : 0;
       return timeB - timeA;
     })
-    .filter((chat) => !chat.isGroup && chat.type !== 'CHANNEL'); // Only direct chats
+    .filter((chat) => !chat?.isGroup && chat.type !== 'CHANNEL'); // Only direct chats
 
   const getChatName = (chat: Chat): string => {
     const { name } = getOtherUserAndGroup(chat, user?._id || null, onlineUsers);
@@ -145,7 +191,7 @@ export default function ChatListScreen() {
   if (isChatsLoading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Loading chats...</Text>
       </View>
     );
@@ -167,7 +213,7 @@ export default function ChatListScreen() {
         <TextInput
           style={styles.searchInput}
           placeholder="Search chats..."
-          placeholderTextColor="#999"
+          placeholderTextColor={colors.mutedForeground}
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
@@ -197,159 +243,4 @@ export default function ChatListScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    backgroundColor: '#fff',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-  newChatButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  newChatButtonText: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: 'bold',
-    lineHeight: 24,
-  },
-  searchContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  searchInput: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    color: '#000',
-  },
-  listContent: {
-    padding: 8,
-  },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#666',
-  },
-  chatItem: {
-    flexDirection: 'row',
-    padding: 12,
-    marginVertical: 2,
-    borderRadius: 12,
-    backgroundColor: '#f9f9f9',
-    marginHorizontal: 8,
-  },
-  avatarContainer: {
-    position: 'relative',
-    marginRight: 12,
-  },
-  avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  onlineBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#4CAF50',
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
-  chatContent: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  chatHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  chatName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
-    flex: 1,
-  },
-  chatTime: {
-    fontSize: 12,
-    color: '#999',
-    marginLeft: 8,
-  },
-  chatFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  lastMessage: {
-    fontSize: 14,
-    color: '#666',
-    flex: 1,
-  },
-  unreadBadge: {
-    backgroundColor: '#007AFF',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-    marginLeft: 8,
-  },
-  unreadBadgeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#666',
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-  },
-});
+

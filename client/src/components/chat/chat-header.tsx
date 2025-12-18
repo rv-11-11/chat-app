@@ -22,34 +22,34 @@ const ChatHeader = ({ chat, currentUserId }: Props) => {
 
   return (
     <>
-      <div className="sticky top-0 z-50 flex items-center gap-3 border-b border-border bg-card/95 px-4 py-3 backdrop-blur">
+      <div className="sticky top-0 z-50 flex items-center gap-3 border-b border-border/40 bg-card/95 backdrop-blur px-4 py-4 shadow-sm">
         <button
           type="button"
           onClick={() => navigate(PROTECTED_ROUTES.CHAT)}
-          className="p-2 hover:bg-muted rounded-lg transition-colors"
+          className="p-2 hover:bg-muted rounded-lg transition-all duration-200 hover:shadow-md"
           aria-label="Back to chats"
         >
-          <ArrowLeft className="h-5 w-5" />
+          <ArrowLeft className="h-5 w-5 text-foreground" />
         </button>
 
         <AvatarWithBadge name={name} src={avatar} isOnline={isOnline} size="w-12 h-12" />
 
         <div className="flex-1 min-w-0">
-          <h5 className="text-base font-semibold truncate">{name}</h5>
+          <h5 className="text-base font-semibold truncate text-foreground">{name}</h5>
           <p className="text-sm text-muted-foreground truncate">{subheading}</p>
         </div>
 
-        <Badge variant="outline" className="text-xs uppercase tracking-wide flex-shrink-0">
+        <Badge variant="outline" className="text-xs uppercase tracking-wide flex-shrink-0 bg-primary/10 text-primary border-primary/30 hover:bg-primary/20 transition-colors duration-200">
           Chat
         </Badge>
 
         <button
           type="button"
           onClick={() => setShowManagementPanel(true)}
-          className="p-2 hover:bg-muted rounded-lg transition-colors"
+          className="p-2 hover:bg-muted rounded-lg transition-all duration-200 hover:shadow-md"
           aria-label="Contact info"
         >
-          <Info className="h-5 w-5" />
+          <Info className="h-5 w-5 text-foreground" />
         </button>
       </div>
 

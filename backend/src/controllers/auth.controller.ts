@@ -12,15 +12,13 @@ export const registerController = asyncHandler(
     const user = await registerService(body);
     const userId = user._id as string;
 
-    return setJwtAuthCookie({
-      res,
-      userId,
-    })
-      .status(HTTPSTATUS.CREATED)
-      .json({
-        message: "User created & login successfully",
-        user,
-      });
+    // Set http-only cookie for web clients and also return token for native clients
+    const token = setJwtAuthCookie({ res, userId });
+    return res.status(HTTPSTATUS.CREATED).json({
+      message: "User created & login successfully",
+      user,
+      token,
+    });
   }
 );
 
@@ -30,15 +28,12 @@ export const loginController = asyncHandler(
 
     const user = await loginService(body);
     const userId = user._id as string;
-    return setJwtAuthCookie({
-      res,
-      userId,
-    })
-      .status(HTTPSTATUS.OK)
-      .json({
-        message: "User login successfully",
-        user,
-      });
+    const token = setJwtAuthCookie({ res, userId });
+    return res.status(HTTPSTATUS.OK).json({
+      message: "User login successfully",
+      user,
+      token,
+    });
   }
 );
 
@@ -56,6 +51,8 @@ export const authStatusController = asyncHandler(
     return res.status(HTTPSTATUS.OK).json({
       message: "Authenticated User",
       user,
+      // Optionally return token again if desired
+      token: undefined,
     });
   }
 );

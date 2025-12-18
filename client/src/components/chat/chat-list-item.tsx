@@ -46,30 +46,28 @@ const ChatListItem = ({ chat, currentUserId, onClick }: PropsType) => {
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left flex items-center gap-3 p-3 pr-20 rounded-lg transition-colors
-        ${theme === "dark" ? "bg-slate-800/10 hover:bg-slate-800" : "bg-gray-50 hover:bg-gray-100"}`}
+      className="w-full text-left flex items-center gap-3 p-4 pr-20 rounded-xl transition-all duration-200 bg-card hover:bg-card/80 hover:shadow-md border border-border/40 hover:border-border/70 active:scale-95 animate-slideInLeft"
     >
       <AvatarWithBadge
         name={name}
         src={avatar}
         isGroup={isGroup}
         isOnline={isOnline}
-        size="w-10 h-10"
+        size="w-11 h-11"
       />
       <div className="flex-1 min-w-0">
-        <h3 className="font-medium truncate">{name}</h3>
-        <p className={`text-sm truncate ${theme === "dark" ? "text-slate-400" : "text-gray-500"}`}>
+        <h3 className="font-semibold truncate text-foreground">{name}</h3>
+        <p className="text-sm truncate text-muted-foreground">
           {getLastMessageText()}
         </p>
       </div>
   <div className="flex flex-col items-end justify-center mr-20 min-w-[50px]">
         {lastMessage?.createdAt && (
-          <span className={`text-xs ${theme === "dark" ? "text-slate-400" : "text-gray-500"}`}>
+          <span className="text-xs text-muted-foreground">
             {formatChatTime(lastMessage.createdAt)}
           </span>
         )}
       </div>
-  {/* optional menu will be rendered by parent as a sibling element outside this button */}
     </button>
   );
 };

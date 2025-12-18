@@ -16,13 +16,17 @@ export const setJwtAuthCookie = ({ res, userId }: Cookie) => {
     expiresIn: expiresIn || "7d",
   });
 
-  return res.cookie("accessToken", token, {
+  // Set cookie for browser clients
+  res.cookie("accessToken", token, {
     maxAge: 7 * 24 * 60 * 60 * 1000,
     httpOnly: true,
     secure: false, // Set to false for HTTP, true for HTTPS
     sameSite: "lax", // Important for Nginx proxy
     path: "/", // Ensure cookie is available for all paths
   });
+
+  // Return the token string as well for native clients to consume
+  return token;
 };
 
 export const clearJwtAuthCookie = (res: Response) =>
