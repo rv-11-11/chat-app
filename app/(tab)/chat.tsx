@@ -20,45 +20,203 @@ export default function ChatListScreen() {
   const colors = useThemeColors();
 
   const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
+    container: { 
+      flex: 1, 
+      backgroundColor: colors.background,
+    },
     header: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      paddingHorizontal: 18,
-      paddingVertical: 14,
+      paddingHorizontal: 20,
+      paddingVertical: 16,
       borderBottomWidth: 0.5,
       borderBottomColor: colors.border,
       backgroundColor: colors.card,
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 3 },
-      shadowOpacity: 0.1,
-      shadowRadius: 10,
-      elevation: 4,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.06,
+      shadowRadius: 8,
+      elevation: 3,
     },
-    headerTitle: { fontSize: 32, fontWeight: '800', color: colors.foreground, letterSpacing: -0.5 },
-    newChatButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 10, elevation: 6 },
-    newChatButtonText: { color: colors.primaryForeground, fontSize: 26, fontWeight: '800', lineHeight: 26 },
-    searchContainer: { paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: colors.border, backgroundColor: colors.background },
-    searchInput: { backgroundColor: colors.muted, borderRadius: 16, paddingHorizontal: 16, paddingVertical: 13, fontSize: 16, color: colors.foreground, borderWidth: 1, borderColor: colors.border },
-    listContent: { paddingVertical: 8, paddingHorizontal: 12 },
-    center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-    loadingText: { marginTop: 12, fontSize: 16, color: colors.mutedForeground, fontWeight: '500' },
-    chatItem: { flexDirection: 'row', padding: 14, marginVertical: 6, borderRadius: 18, backgroundColor: colors.card, marginHorizontal: 6, borderWidth: 0.8, borderColor: colors.border, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6, elevation: 3 },
-    avatarContainer: { position: 'relative', marginRight: 13 },
-    avatar: { width: 54, height: 54, borderRadius: 27, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
-    avatarText: { color: colors.primaryForeground, fontSize: 22, fontWeight: '800' },
-    onlineBadge: { position: 'absolute', bottom: 0, right: 0, width: 17, height: 17, borderRadius: 8.5, backgroundColor: '#10b981', borderWidth: 3, borderColor: colors.card, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.25, shadowRadius: 3, elevation: 4 },
-    chatContent: { flex: 1, justifyContent: 'center' },
-    chatHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 },
-    chatName: { fontSize: 17, fontWeight: '800', color: colors.foreground, flex: 1, letterSpacing: -0.3 },
-    chatTime: { fontSize: 12, color: colors.mutedForeground, marginLeft: 8, fontWeight: '600' },
-    chatFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    lastMessage: { fontSize: 14, color: colors.mutedForeground, flex: 1, fontWeight: '400' },
-    unreadBadge: { backgroundColor: colors.primary, borderRadius: 13, minWidth: 24, height: 24, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8, marginLeft: 10, shadowColor: colors.primary, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.35, shadowRadius: 5, elevation: 3 },
-    unreadBadgeText: { color: colors.primaryForeground, fontSize: 11, fontWeight: '800' },
-    emptyText: { fontSize: 20, fontWeight: '800', color: colors.mutedForeground, marginBottom: 10 },
-    emptySubtext: { fontSize: 15, color: colors.mutedForeground, textAlign: 'center', fontWeight: '500', lineHeight: 22 },
+    headerTitle: { 
+      fontSize: 32, 
+      fontWeight: '800', 
+      color: colors.foreground, 
+      letterSpacing: -0.5,
+    },
+    newChatButton: { 
+      width: 48, 
+      height: 48, 
+      borderRadius: 24, 
+      backgroundColor: colors.primary, 
+      justifyContent: 'center', 
+      alignItems: 'center', 
+      shadowColor: colors.primary, 
+      shadowOffset: { width: 0, height: 4 }, 
+      shadowOpacity: 0.3, 
+      shadowRadius: 10, 
+      elevation: 6,
+    },
+    newChatButtonText: { 
+      color: colors.primaryForeground, 
+      fontSize: 28, 
+      fontWeight: '700', 
+      lineHeight: 28,
+    },
+    searchContainer: { 
+      paddingHorizontal: 20, 
+      paddingVertical: 16, 
+      backgroundColor: colors.background,
+      gap: 8,
+    },
+    searchInput: { 
+      backgroundColor: colors.muted, 
+      borderRadius: 12, 
+      paddingHorizontal: 16, 
+      paddingVertical: 12, 
+      fontSize: 16, 
+      color: colors.foreground, 
+      borderWidth: 1, 
+      borderColor: colors.border,
+      fontWeight: '500',
+    },
+    listContent: { 
+      paddingVertical: 12, 
+      paddingHorizontal: 16,
+      gap: 8,
+    },
+    center: { 
+      flex: 1, 
+      justifyContent: 'center', 
+      alignItems: 'center', 
+      paddingHorizontal: 24,
+      paddingVertical: 40,
+    },
+    loadingText: { 
+      marginTop: 16, 
+      fontSize: 16, 
+      color: colors.mutedForeground, 
+      fontWeight: '500',
+    },
+    chatItem: { 
+      flexDirection: 'row', 
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      marginVertical: 4,
+      borderRadius: 12, 
+      backgroundColor: colors.card, 
+      borderWidth: 0.8, 
+      borderColor: colors.border, 
+      shadowColor: '#000', 
+      shadowOffset: { width: 0, height: 1 }, 
+      shadowOpacity: 0.06, 
+      shadowRadius: 4, 
+      elevation: 2,
+    },
+    avatarContainer: { 
+      position: 'relative', 
+      marginRight: 16,
+    },
+    avatar: { 
+      width: 56, 
+      height: 56, 
+      borderRadius: 28, 
+      backgroundColor: colors.primary, 
+      justifyContent: 'center', 
+      alignItems: 'center',
+    },
+    avatarText: { 
+      color: colors.primaryForeground, 
+      fontSize: 20, 
+      fontWeight: '700',
+    },
+    onlineBadge: { 
+      position: 'absolute', 
+      bottom: 0, 
+      right: 0, 
+      width: 18, 
+      height: 18, 
+      borderRadius: 9, 
+      backgroundColor: '#10b981', 
+      borderWidth: 3, 
+      borderColor: colors.card, 
+      shadowColor: '#000', 
+      shadowOffset: { width: 0, height: 1 }, 
+      shadowOpacity: 0.25, 
+      shadowRadius: 2, 
+      elevation: 3,
+    },
+    chatContent: { 
+      flex: 1, 
+      justifyContent: 'center',
+      gap: 8,
+    },
+    chatHeader: { 
+      flexDirection: 'row', 
+      justifyContent: 'space-between', 
+      alignItems: 'center',
+      gap: 12,
+    },
+    chatName: { 
+      fontSize: 16, 
+      fontWeight: '700', 
+      color: colors.foreground, 
+      flex: 1, 
+      letterSpacing: -0.2,
+    },
+    chatTime: { 
+      fontSize: 12, 
+      color: colors.mutedForeground, 
+      fontWeight: '500',
+      flexShrink: 1,
+    },
+    chatFooter: { 
+      flexDirection: 'row', 
+      justifyContent: 'space-between', 
+      alignItems: 'center',
+      gap: 12,
+    },
+    lastMessage: { 
+      fontSize: 14, 
+      color: colors.mutedForeground, 
+      flex: 1, 
+      fontWeight: '400',
+    },
+    unreadBadge: { 
+      backgroundColor: colors.primary, 
+      borderRadius: 12, 
+      minWidth: 26, 
+      height: 26, 
+      justifyContent: 'center', 
+      alignItems: 'center', 
+      paddingHorizontal: 8,
+      flexShrink: 1,
+      shadowColor: colors.primary, 
+      shadowOffset: { width: 0, height: 2 }, 
+      shadowOpacity: 0.25, 
+      shadowRadius: 4, 
+      elevation: 2,
+    },
+    unreadBadgeText: { 
+      color: colors.primaryForeground, 
+      fontSize: 11, 
+      fontWeight: '700',
+    },
+    emptyText: { 
+      fontSize: 22, 
+      fontWeight: '700', 
+      color: colors.foreground, 
+      marginBottom: 12,
+      textAlign: 'center',
+    },
+    emptySubtext: { 
+      fontSize: 15, 
+      color: colors.mutedForeground, 
+      textAlign: 'center', 
+      fontWeight: '500', 
+      lineHeight: 22,
+    },
   });
 
   useEffect(() => {
@@ -137,10 +295,10 @@ export default function ChatListScreen() {
   };
 
   const renderChatItem = ({ item }: { item: Chat }) => {
-    const chatName = getChatName(item);
+    const chatName = getChatName(item) || 'Unknown';
     const avatar = getChatAvatar(item);
     const isOnline = getChatOnlineStatus(item);
-    const lastMessage = getLastMessage(item);
+    const lastMessage = getLastMessage(item) || 'No message';
 
     return (
       <TouchableOpacity
@@ -150,38 +308,34 @@ export default function ChatListScreen() {
       >
         <View style={styles.avatarContainer}>
           <View style={[styles.avatar, avatar && { backgroundColor: '#e0e0e0' }]}>
-            {avatar ? (
-              <Text style={styles.avatarText}>IMG</Text>
-            ) : (
-              <Text style={styles.avatarText}>
-                {chatName.charAt(0).toUpperCase()}
-              </Text>
-            )}
+            <Text style={styles.avatarText}>
+              {String(chatName).charAt(0).toUpperCase()}
+            </Text>
           </View>
-          {isOnline && <View style={styles.onlineBadge} />}
+          {isOnline ? <View style={styles.onlineBadge} /> : null}
         </View>
         <View style={styles.chatContent}>
           <View style={styles.chatHeader}>
             <Text style={styles.chatName} numberOfLines={1}>
-              {chatName}
+              {String(chatName)}
             </Text>
-            {item.lastMessage && (
+            {item.lastMessage ? (
               <Text style={styles.chatTime}>
-                {formatChatTime(item.lastMessage.createdAt)}
+                {String(formatChatTime(item.lastMessage.createdAt))}
               </Text>
-            )}
+            ) : null}
           </View>
           <View style={styles.chatFooter}>
             <Text style={styles.lastMessage} numberOfLines={1}>
-              {lastMessage}
+              {String(lastMessage)}
             </Text>
-            {item.unreadCount && item.unreadCount > 0 && (
+            {(item.unreadCount && item.unreadCount > 0) ? (
               <View style={styles.unreadBadge}>
                 <Text style={styles.unreadBadgeText}>
-                  {item.unreadCount > 99 ? '99+' : item.unreadCount}
+                  {String(item.unreadCount > 99 ? '99+' : item.unreadCount)}
                 </Text>
               </View>
-            )}
+            ) : null}
           </View>
         </View>
       </TouchableOpacity>
@@ -221,7 +375,7 @@ export default function ChatListScreen() {
 
       <FlatList
         data={filteredChats}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item, index) => `${item._id}-${index}`}
         renderItem={renderChatItem}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={

@@ -23,7 +23,7 @@ const TabRoot =() => {
                 name="chat"
                 options={{
                     title: "Chats",
-                    headerLeft: () => <DrawerToggle />,
+                    headerShown: false,
                     tabBarIcon: ({ color }) => (
                         <FontAwesome name="commenting" size={24} color={color} />
                     ),
@@ -34,7 +34,7 @@ const TabRoot =() => {
                 name="community"
                 options={{
                     title: "Community",
-                    headerLeft: () => <DrawerToggle />,
+                    headerShown: false,
                     tabBarIcon: ({ color }) => (
                         <FontAwesome name="users" size={24} color={color} />
                     ),
@@ -44,8 +44,8 @@ const TabRoot =() => {
             <Tabs.Screen 
                 name="group"
                 options={{
-                    headerLeft: () => <DrawerToggle />,
                     title: "Groups",
+                    headerShown: false,
                     tabBarIcon: ({ color }) => (
                         <FontAwesome name="object-group" size={24} color={color} />
                     ),
@@ -55,8 +55,8 @@ const TabRoot =() => {
             <Tabs.Screen 
                 name="channel"
                 options={{
-                    headerLeft: () => <DrawerToggle />,
                     title: "Channels",
+                    headerShown: false,
                     tabBarIcon: ({ color }) => (
                         <FontAwesome name="rss" size={24} color={color} />
                     ),

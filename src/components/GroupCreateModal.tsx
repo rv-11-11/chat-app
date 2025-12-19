@@ -1,6 +1,7 @@
+import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Image, Modal, Picker, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { userApi } from '../services/api/user';
 import { useChatStore } from '../store/chatStore';
 import type { User } from '../types/auth.types';
@@ -125,6 +126,12 @@ export default function GroupCreateModal({ visible, onClose }: Props) {
     </TouchableOpacity>
   );
 
+  const renderUserWrapper = (item: User) => (
+    <View key={item._id}>
+      {renderUser({ item })}
+    </View>
+  );
+
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
@@ -191,8 +198,12 @@ export default function GroupCreateModal({ visible, onClose }: Props) {
               ))}
             </View>
 
-            <View style={{ height: 200 }}>
-              {isSearching ? <ActivityIndicator /> : <FlatList data={results} keyExtractor={(i) => i._id} renderItem={renderUser} />}
+            <View style={{ minHeight: 200, marginTop: 12 }}>
+              {isSearching ? (
+                <ActivityIndicator style={{ marginTop: 20 }} />
+              ) : (
+                results.map(renderUserWrapper)
+              )}
             </View>
 
             <TouchableOpacity style={styles.createBtn} onPress={handleCreate} disabled={isCreating}>

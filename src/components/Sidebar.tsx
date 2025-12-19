@@ -23,7 +23,6 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   { icon: 'user', label: 'My Profile', route: '/(drawer)/myProfile' },
-  { icon: 'plus-circle', label: 'New Group', route: '/(drawer)/newGroup' },
   { icon: 'cog', label: 'Settings', route: '/(drawer)/setting' },
   { icon: 'user-plus', label: 'Invite Friends', route: '/(drawer)/inviteFriend' },
   { icon: 'globe', label: 'Website Features', route: '/(drawer)/webSiteFeature' },

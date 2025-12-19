@@ -1,9 +1,12 @@
+import axios from 'axios';
 import { ENV } from '../config/env';
-import apiClient from '../services/api/client';
 
 export const testBackendConnection = async (): Promise<boolean> => {
   try {
-    const response = await apiClient.get('/health');
+    // Use axios directly to hit /health endpoint (not /api/health)
+    const response = await axios.get(`${ENV.API_URL}/health`, {
+      timeout: 5000,
+    });
     console.log('✅ Backend connection successful:', response.data);
     return true;
   } catch (error: any) {

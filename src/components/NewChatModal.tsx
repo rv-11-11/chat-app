@@ -9,11 +9,14 @@ import {
   StyleSheet,
   ActivityIndicator,
   Keyboard,
+  SafeAreaView,
 } from 'react-native';
 import { useChatStore } from '../store/chatStore';
 import { userApi } from '../services/api/user';
+import { useThemeColors } from '../utils/theme';
 import type { User } from '../types/auth.types';
 import { useRouter } from 'expo-router';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 
 interface NewChatModalProps {
   visible: boolean;
@@ -27,6 +30,7 @@ export default function NewChatModal({ visible, onClose }: NewChatModalProps) {
   const [loadingUserId, setLoadingUserId] = useState<string | null>(null);
   const { createChat } = useChatStore();
   const router = useRouter();
+  const colors = useThemeColors();
 
   // Debounced search
   useEffect(() => {
@@ -79,26 +83,137 @@ export default function NewChatModal({ visible, onClose }: NewChatModalProps) {
 
   const renderUserItem = ({ item }: { item: User }) => (
     <TouchableOpacity
-      style={styles.userItem}
+      style={[styles.userItem, { backgroundColor: colors.card, borderColor: colors.border }]}
       onPress={() => handleCreateChat(item._id)}
       disabled={loadingUserId !== null}
+      activeOpacity={0.7}
     >
-      <View style={styles.userAvatar}>
-        <Text style={styles.userAvatarText}>
+      <View style={[styles.userAvatar, { backgroundColor: colors.primary }]}>
+        <Text style={[styles.userAvatarText, { color: colors.primaryForeground }]}>
           {item.name.charAt(0).toUpperCase()}
         </Text>
       </View>
       <View style={styles.userInfo}>
-        <Text style={styles.userName}>{item.name}</Text>
+        <Text style={[styles.userName, { color: colors.foreground }]}>{item.name}</Text>
         {item.username && (
-          <Text style={styles.userUsername}>@{item.username}</Text>
+          <Text style={[styles.userUsername, { color: colors.mutedForeground }]}>@{item.username}</Text>
         )}
       </View>
       {loadingUserId === item._id && (
-        <ActivityIndicator size="small" color="#007AFF" />
+        <ActivityIndicator size="small" color={colors.primary} />
       )}
     </TouchableOpacity>
   );
+
+  const styles = StyleSheet.create({
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.4)',
+      justifyContent: 'flex-end',
+    },
+    modalContent: {
+      backgroundColor: colors.background,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      maxHeight: '85%',
+      minHeight: '50%',
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderBottomWidth: 0.5,
+      borderBottomColor: colors.border,
+    },
+    headerTitle: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: colors.foreground,
+      letterSpacing: -0.2,
+    },
+    closeButton: {
+      width: 40,
+      height: 40,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderRadius: 10,
+      backgroundColor: colors.muted,
+    },
+    closeButtonText: {
+      fontSize: 20,
+      color: colors.foreground,
+      fontWeight: '600',
+    },
+    searchContainer: {
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderBottomWidth: 0.5,
+      borderBottomColor: colors.border,
+    },
+    searchInput: {
+      backgroundColor: colors.muted,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      fontSize: 15,
+      color: colors.foreground,
+      borderWidth: 1,
+      borderColor: colors.border,
+      fontWeight: '500',
+    },
+    resultsContainer: {
+      flex: 1,
+      paddingHorizontal: 12,
+      paddingVertical: 12,
+    },
+    center: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+    },
+    hintText: {
+      fontSize: 16,
+      color: colors.mutedForeground,
+      textAlign: 'center',
+      fontWeight: '500',
+    },
+    userItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      borderRadius: 12,
+      marginVertical: 4,
+      borderWidth: 0.8,
+    },
+    userAvatar: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
+    },
+    userAvatarText: {
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    userInfo: {
+      flex: 1,
+      gap: 2,
+    },
+    userName: {
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    userUsername: {
+      fontSize: 13,
+      fontWeight: '500',
+    },
+  });
 
   return (
     <Modal
@@ -107,12 +222,12 @@ export default function NewChatModal({ visible, onClose }: NewChatModalProps) {
       transparent={true}
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
+      <SafeAreaView style={[styles.modalOverlay, { flex: 1 }]}>
         <View style={styles.modalContent}>
           <View style={styles.header}>
             <Text style={styles.headerTitle}>New Chat</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Text style={styles.closeButtonText}>✕</Text>
+              <FontAwesome name="times" size={18} color={colors.foreground} />
             </TouchableOpacity>
           </View>
 
@@ -120,7 +235,7 @@ export default function NewChatModal({ visible, onClose }: NewChatModalProps) {
             <TextInput
               style={styles.searchInput}
               placeholder="Search by name or @username..."
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.mutedForeground}
               value={searchQuery}
               onChangeText={setSearchQuery}
               autoFocus={true}
@@ -136,7 +251,7 @@ export default function NewChatModal({ visible, onClose }: NewChatModalProps) {
               </View>
             ) : isSearching ? (
               <View style={styles.center}>
-                <ActivityIndicator size="large" color="#007AFF" />
+                <ActivityIndicator size="large" color={colors.primary} />
               </View>
             ) : searchResults.length === 0 ? (
               <View style={styles.center}>
@@ -148,114 +263,16 @@ export default function NewChatModal({ visible, onClose }: NewChatModalProps) {
                 keyExtractor={(item) => item._id}
                 renderItem={renderUserItem}
                 keyboardShouldPersistTaps="handled"
+                scrollEnabled={true}
               />
             )}
           </View>
         </View>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }
 
-const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '80%',
-    minHeight: '50%',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#000',
-  },
-  closeButton: {
-    width: 30,
-    height: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  closeButtonText: {
-    fontSize: 24,
-    color: '#666',
-  },
-  searchContainer: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  searchInput: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 16,
-    color: '#000',
-  },
-  resultsContainer: {
-    flex: 1,
-    padding: 8,
-  },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  hintText: {
-    fontSize: 16,
-    color: '#999',
-    textAlign: 'center',
-  },
-  userItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 10,
-    marginVertical: 4,
-    backgroundColor: '#f9f9f9',
-  },
-  userAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  userAvatarText: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 2,
-  },
-  userUsername: {
-    fontSize: 14,
-    color: '#666',
-  },
-});
 
 
 

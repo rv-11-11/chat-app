@@ -22,6 +22,8 @@ export default function ChatScreen() {
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const flatListRef = useRef<FlatList>(null);
   const typingTimeoutRef = useRef<Record<string, NodeJS.Timeout>>({});
+  const inputRef = useRef<TextInput>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const colors = useThemeColors();
 
   const styles = StyleSheet.create({
@@ -46,8 +48,34 @@ export default function ChatScreen() {
     myMessageText: { color: colors.primaryForeground },
     messageTime: { fontSize: 11, color: colors.mutedForeground, alignSelf: 'flex-end', fontWeight: '500' },
     myMessageTime: { color: 'rgba(255,255,255,0.75)' },
-    inputContainer: { flexDirection: 'row', paddingHorizontal: 14, paddingVertical: 13, backgroundColor: colors.card, borderTopWidth: 0.5, borderTopColor: colors.border, alignItems: 'flex-end', shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
-    input: { flex: 1, borderWidth: 1.2, borderColor: colors.border, borderRadius: 22, paddingHorizontal: 18, paddingVertical: 12, maxHeight: 110, marginRight: 10, color: colors.foreground, backgroundColor: colors.muted, fontSize: 16 },
+    inputContainer: { 
+      flexDirection: 'row', 
+      paddingHorizontal: 14, 
+      paddingVertical: 12,
+      backgroundColor: colors.card, 
+      borderTopWidth: 0.5, 
+      borderTopColor: colors.border, 
+      alignItems: 'flex-end', 
+      shadowColor: '#000', 
+      shadowOffset: { width: 0, height: -2 }, 
+      shadowOpacity: 0.05, 
+      shadowRadius: 4, 
+      elevation: 2,
+      gap: 10,
+    },
+    input: { 
+      flex: 1, 
+      borderWidth: 1.2, 
+      borderColor: colors.border, 
+      borderRadius: 22, 
+      paddingHorizontal: 18, 
+      paddingVertical: 12, 
+      maxHeight: 110, 
+      color: colors.foreground, 
+      backgroundColor: colors.muted, 
+      fontSize: 16,
+      fontWeight: '500',
+    },
     sendButton: { backgroundColor: colors.primary, borderRadius: 22, paddingHorizontal: 22, paddingVertical: 12, justifyContent: 'center', alignItems: 'center', shadowColor: colors.primary, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 4 },
     sendButtonDisabled: { opacity: 0.55 },
     sendButtonText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 15 },
@@ -215,10 +243,10 @@ export default function ChatScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
+    <KeyboardAvoidingView 
+      style={{ flex: 1, backgroundColor: colors.background }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={90}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -238,6 +266,7 @@ export default function ChatScreen() {
           </TouchableOpacity>
         )}
       </View>
+      
       <FlatList
         ref={flatListRef}
         data={messages}
@@ -246,6 +275,8 @@ export default function ChatScreen() {
         contentContainerStyle={styles.messagesList}
         inverted={false}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        scrollEnabled={true}
         ListFooterComponent={
           typingUsers.length > 0 ? (
             <View style={styles.typingIndicator}>
@@ -257,8 +288,10 @@ export default function ChatScreen() {
           ) : null
         }
       />
+      
       <View style={styles.inputContainer}>
         <TextInput
+          ref={inputRef}
           style={styles.input}
           placeholder="Type a message..."
           placeholderTextColor={colors.mutedForeground}
@@ -275,6 +308,7 @@ export default function ChatScreen() {
           <Text style={styles.sendButtonText}>Send</Text>
         </TouchableOpacity>
       </View>
+      
       <GroupDetailsModal visible={isGroupModalOpen} onClose={() => setIsGroupModalOpen(false)} chat={currentChat} />
     </KeyboardAvoidingView>
   );
