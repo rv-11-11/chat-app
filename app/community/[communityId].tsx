@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Image, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import "../../global.css";
 import { useAuthStore } from '../../src/store/authStore';
 import { useChatStore } from '../../src/store/chatStore';
@@ -8,6 +9,7 @@ import { useCommunityStore } from '../../src/store/communityStore';
 import { useThemeColors } from '../../src/utils/theme';
 
 export default function CommunityDetailScreen() {
+  const insets = useSafeAreaInsets();
   const { communityId } = useLocalSearchParams<{ communityId: string }>();
   const { currentCommunity, getCommunity, leaveCommunity, deleteCommunity, addChatToCommunity, removeChatFromCommunity, isCommunitiesLoading } = useCommunityStore();
   const { chats, fetchChats } = useChatStore();
@@ -21,6 +23,7 @@ export default function CommunityDetailScreen() {
     container: {
       flex: 1,
       backgroundColor: colors.background,
+      paddingTop: insets.top,
     },
     header: {
       backgroundColor: colors.card,
@@ -314,7 +317,7 @@ export default function CommunityDetailScreen() {
     }
 
     const options = availableChats.map(chat => ({
-      text: chat.groupName || chat.channelName || 'Unnamed',
+      text: chat.groupName || chat.channelUsername || 'Unnamed',
       onPress: async () => {
         try {
           await addChatToCommunity(communityId, chat._id, chatType);
@@ -326,7 +329,7 @@ export default function CommunityDetailScreen() {
       },
     }));
 
-    options.push({ text: 'Cancel', onPress: () => {} });
+    options.push({ text: 'Cancel', onPress: async () => {} });
 
     Alert.alert(`Add ${chatType === 'GROUP' ? 'Group' : 'Channel'}`, 'Select a chat to add:', options);
   };

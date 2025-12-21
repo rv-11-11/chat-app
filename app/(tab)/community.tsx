@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Image, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import "../../global.css";
 import CommunityCreateModal from '../../src/components/CommunityCreateModal';
 import { useAuthStore } from '../../src/store/authStore';
@@ -9,6 +10,7 @@ import type { CommunityType } from '../../src/types/community.type';
 import { useThemeColors } from '../../src/utils/theme';
 
 const Community = () => {
+  const insets = useSafeAreaInsets();
   const { communities, publicCommunities, fetchUserCommunities, fetchPublicCommunities, isCommunitiesLoading, joinCommunity, leaveCommunity, deleteCommunity } = useCommunityStore();
   const { isCreateOpen, setIsCreateOpen } = useCommunityStore();
   const { user } = useAuthStore();
@@ -20,7 +22,8 @@ const Community = () => {
   const styles = StyleSheet.create({
     container: { 
       flex: 1, 
-      backgroundColor: colors.background 
+      backgroundColor: colors.background,
+      paddingTop: insets.top,
     },
     header: { 
       flexDirection: 'row', 
