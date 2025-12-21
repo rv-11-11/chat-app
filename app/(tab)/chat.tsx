@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import NewChatModal from '../../src/components/NewChatModal';
 import { useSocket } from '../../src/hooks/useSocket';
 import { useAuthStore } from '../../src/store/authStore';
@@ -11,6 +12,7 @@ import { formatChatTime, getOtherUserAndGroup } from '../../src/utils/helpers';
 import { useThemeColors } from '../../src/utils/theme';
 
 export default function ChatListScreen() {
+  const insets = useSafeAreaInsets();
   const { chats, fetchChats, isChatsLoading, addNewMessage, updateChatLastMessage, updateChatUnread, addNewChat } = useChatStore();
   const { onlineUsers } = useSocketStore();
   const { user } = useAuthStore();
@@ -23,6 +25,7 @@ export default function ChatListScreen() {
     container: { 
       flex: 1, 
       backgroundColor: colors.background,
+      paddingTop: insets.top,
     },
     header: {
       flexDirection: 'row',

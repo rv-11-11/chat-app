@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import "../../global.css";
 import GroupCreateModal from '../../src/components/GroupCreateModal';
 import { chatApi } from '../../src/services/api/chat';
@@ -9,6 +10,7 @@ import { useChatStore } from '../../src/store/chatStore';
 import { useThemeColors } from '../../src/utils/theme';
 
 export default function GroupListScreen() {
+  const insets = useSafeAreaInsets();
   const { chats, fetchChats, isChatsLoading } = useChatStore();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const router = useRouter();
@@ -18,6 +20,7 @@ export default function GroupListScreen() {
     container: { 
       flex: 1, 
       backgroundColor: colors.background,
+      paddingTop: insets.top,
     },
     header: { 
       flexDirection: 'row', 

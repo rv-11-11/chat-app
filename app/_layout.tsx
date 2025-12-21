@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { View } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '../src/store/authStore';
 import { useSocketStore } from '../src/store/socketStore';
 import { useSidebarStore } from '../src/store/sidebarStore';
@@ -39,18 +40,20 @@ export default function RootLayout() {
   }, [user, isConnected, connect, disconnect]);
 
   return (
-    <View style={{ flex: 1 }}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="(drawer)" />
-        <Stack.Screen name="(tab)" />
-        <Stack.Screen name="chat/[chatId]" />
-        <Stack.Screen name="channel/[channelId]" />
-        <Stack.Screen name="group/[groupId]" />
-        <Stack.Screen name="community/[communityId]" />
-      </Stack>
-      <Sidebar visible={isOpen} onClose={closeSidebar} />
-    </View>
+    <SafeAreaProvider>
+      <View style={{ flex: 1 }}>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="(drawer)" />
+          <Stack.Screen name="(tab)" />
+          <Stack.Screen name="chat/[chatId]" />
+          <Stack.Screen name="channel/[channelId]" />
+          <Stack.Screen name="group/[groupId]" />
+          <Stack.Screen name="community/[communityId]" />
+        </Stack>
+        <Sidebar visible={isOpen} onClose={closeSidebar} />
+      </View>
+    </SafeAreaProvider>
   );
 }

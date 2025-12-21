@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import "../../global.css";
 import ChannelCreateModal from '../../src/components/ChannelCreateModal';
 import { channelApi } from '../../src/services/api/channel';
 import { useThemeColors } from '../../src/utils/theme';
 
 export default function ChannelListScreen() {
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
   const [channels, setChannels] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -14,6 +18,7 @@ export default function ChannelListScreen() {
     setLoading(true);
     try {
       const res = await channelApi.getUserChannels();
+      console.log('Fetched channels:', res.channels);
       setChannels(res.channels || []);
     } catch (err) {
       console.error('Failed to fetch channels', err);
@@ -32,6 +37,7 @@ export default function ChannelListScreen() {
     container: { 
       flex: 1, 
       backgroundColor: colors.background,
+      paddingTop: insets.top,
     },
     header: { 
       flexDirection: 'row', 
@@ -149,19 +155,23 @@ export default function ChannelListScreen() {
   });
 
   const renderItem = ({ item }: any) => (
-    <TouchableOpacity style={styles.item} onPress={() => { /* navigate to channel chat */ }} activeOpacity={0.7}>
+    <TouchableOpacity 
+      style={styles.item} 
+      onPress={() => router.push(`/channel/${item._id}`)}
+      activeOpacity={0.7}
+    >
       <View style={styles.avatar}>
         <Text style={styles.avatarText}>
-          {(item.name || 'C').charAt(0).toUpperCase()}
+          {item.icon? item.icon : item.channelUsername.charAt(0).toUpperCase()}
         </Text>
       </View>
       <View style={styles.info}>
-        <Text style={styles.title} numberOfLines={1}>{item.name}</Text>
-        <Text style={styles.subtitle} numberOfLines={1}>{item.description || 'No description'}</Text>
+        <Text style={styles.title} numberOfLines={1}>{item.channelUsername}</Text>
+        <Text style={styles.subtitle} numberOfLines={1}>{item.channelDescription || 'No description'}</Text>
       </View>
       <View>
         <Text style={styles.subscriberCount}>
-          {item.subscriberCount || 0} subscribers
+          {(item.participants?.length) || 0} subscribers
         </Text>
       </View>
     </TouchableOpacity>

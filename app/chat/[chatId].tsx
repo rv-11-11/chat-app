@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import GroupDetailsModal from '../../src/components/GroupDetailsModal';
 import { useSocket } from '../../src/hooks/useSocket';
 import { useAuthStore } from '../../src/store/authStore';
@@ -11,6 +12,7 @@ import { formatMessageTime, getOtherUserAndGroup } from '../../src/utils/helpers
 import { useThemeColors } from '../../src/utils/theme';
 
 export default function ChatScreen() {
+  const insets = useSafeAreaInsets();
   const { chatId } = useLocalSearchParams<{ chatId: string }>();
   const { currentChat, messages, fetchChat, sendMessage, addNewMessage, removeMessage, isSendingMessage, markAsRead } = useChatStore();
   const { user } = useAuthStore();
@@ -27,8 +29,19 @@ export default function ChatScreen() {
   const colors = useThemeColors();
 
   const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
-    header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: colors.card, borderBottomWidth: 0.5, borderBottomColor: colors.border, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 },
+    container: { flex: 1, backgroundColor: colors.background, paddingTop: insets.top },
+    header: { flexDirection: 'row', 
+      alignItems: 'center', 
+      paddingHorizontal: 16, 
+      paddingVertical: 14, 
+      backgroundColor: colors.card, 
+      borderBottomWidth: 0.5, 
+      borderBottomColor: colors.border, 
+      shadowColor: '#000', 
+      shadowOffset: { width: 0, height: 2 }, 
+      shadowOpacity: 0.08, 
+      shadowRadius: 8, 
+      elevation: 3 },
     backButton: { marginRight: 13, padding: 6 },
     backButtonText: { fontSize: 26, color: colors.primary, fontWeight: '800' },
     headerInfo: { flex: 1 },
@@ -244,7 +257,7 @@ export default function ChatScreen() {
 
   return (
     <KeyboardAvoidingView 
-      style={{ flex: 1, backgroundColor: colors.background }}
+      style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
@@ -280,9 +293,9 @@ export default function ChatScreen() {
         ListFooterComponent={
           typingUsers.length > 0 ? (
             <View style={styles.typingIndicator}>
-              <View style={[styles.typingDot, { animation: 'pulse' }]} />
-              <View style={[styles.typingDot, { animation: 'pulse', animationDelay: '0.2s' }]} />
-              <View style={[styles.typingDot, { animation: 'pulse', animationDelay: '0.4s' }]} />
+              <View style={styles.typingDot} />
+              <View style={styles.typingDot} />
+              <View style={styles.typingDot} />
               <Text style={styles.typingText}>{getTypingText()}</Text>
             </View>
           ) : null
