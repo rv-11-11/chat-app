@@ -317,7 +317,7 @@ export default function CommunityDetailScreen() {
     }
 
     const options = availableChats.map(chat => ({
-      text: chat.groupName || chat.channelName || 'Unnamed',
+      text: chat.groupName || chat.channelUsername || 'Unnamed',
       onPress: async () => {
         try {
           await addChatToCommunity(communityId, chat._id, chatType);
@@ -329,7 +329,7 @@ export default function CommunityDetailScreen() {
       },
     }));
 
-    options.push({ text: 'Cancel', onPress: () => {} });
+    options.push({ text: 'Cancel', onPress: async () => {} });
 
     Alert.alert(`Add ${chatType === 'GROUP' ? 'Group' : 'Channel'}`, 'Select a chat to add:', options);
   };

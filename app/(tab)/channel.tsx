@@ -157,7 +157,7 @@ export default function ChannelListScreen() {
   const renderItem = ({ item }: any) => (
     <TouchableOpacity 
       style={styles.item} 
-      onPress={() => router.push(`/channel/${item._id}`)}
+      onPress={() => router.push(`/channel/${item._id}` as any)}
       activeOpacity={0.7}
     >
       <View style={styles.avatar}>

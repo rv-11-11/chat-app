@@ -23,7 +23,7 @@ export default function ChatScreen() {
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const flatListRef = useRef<FlatList>(null);
-  const typingTimeoutRef = useRef<Record<string, NodeJS.Timeout>>({});
+  const typingTimeoutRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const inputRef = useRef<TextInput>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const colors = useThemeColors();
