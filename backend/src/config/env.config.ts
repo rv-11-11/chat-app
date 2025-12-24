@@ -2,7 +2,7 @@ import { getEnv } from "../services/utils/get-env";
 
 export const Env = {
   NODE_ENV: getEnv("NODE_ENV", "development"),
-  PORT: getEnv("PORT", "8000"),
+  PORT: getEnv("PORT", "9000"),
 
   MONGO_URI: getEnv(
     "MONGO_URI",
@@ -10,7 +10,7 @@ export const Env = {
   ),
 
   JWT_SECRET: getEnv("JWT_SECRET", "secret_jwt"),
-  JWT_EXPIRES_IN: getEnv("JWT_EXPIRES_IN", "15m"),
+  JWT_EXPIRES_IN: getEnv("JWT_EXPIRES_IN", "3315m"),
 
   SESSION_SECRET: getEnv(
     "SESSION_SECRET",

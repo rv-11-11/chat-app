@@ -2,9 +2,13 @@ import { useState } from 'react';
 import { ActivityIndicator, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { channelApi } from '../services/api/channel';
 
-interface Props { visible: boolean; onClose: () => void }
+interface Props { 
+  visible: boolean; 
+  onClose: () => void;
+  onCreated?: (channel: any) => void;
+}
 
-export default function ChannelCreateModal({ visible, onClose }: Props) {
+export default function ChannelCreateModal({ visible, onClose, onCreated }: Props) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [isPublic, setIsPublic] = useState(true);
@@ -14,7 +18,10 @@ export default function ChannelCreateModal({ visible, onClose }: Props) {
     if (!name.trim()) return alert('Channel name required');
     setLoading(true);
     try {
-      await channelApi.createChannel({ name: name.trim(), description: description.trim(), isPublic });
+      const result = await channelApi.createChannel({ name: name.trim(), description: description.trim(), isPublic });
+      if (onCreated && result?.channel) {
+        onCreated(result.channel);
+      }
       onClose();
     } catch (err) {
       console.error('Create channel failed', err);

@@ -1,12 +1,16 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Image, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Image, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View, Modal, TextInput, Share } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import "../../global.css";
 import { useAuthStore } from '../../src/store/authStore';
 import { useChatStore } from '../../src/store/chatStore';
 import { useCommunityStore } from '../../src/store/communityStore';
 import { useThemeColors } from '../../src/utils/theme';
+import GroupCreateModal from '../../src/components/GroupCreateModal';
+import ChannelCreateModal from '../../src/components/ChannelCreateModal';
+import { channelApi } from '../../src/services/api/channel';
+import { userApi } from '../../src/services/api/user';
 
 export default function CommunityDetailScreen() {
   const insets = useSafeAreaInsets();
@@ -18,6 +22,29 @@ export default function CommunityDetailScreen() {
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   const [activeSection, setActiveSection] = useState<'groups' | 'channels' | 'members'>('groups');
+  const [createGroupOpen, setCreateGroupOpen] = useState(false);
+  const [createChannelOpen, setCreateChannelOpen] = useState(false);
+  const [addMemberOpen, setAddMemberOpen] = useState(false);
+  const [memberIdInput, setMemberIdInput] = useState('');
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsName, setSettingsName] = useState('');
+  const [settingsDescription, setSettingsDescription] = useState('');
+  const [settingsPublic, setSettingsPublic] = useState(true);
+  const [settingsInviteJoin, setSettingsInviteJoin] = useState(true);
+  const [addExistingOpen, setAddExistingOpen] = useState(false);
+  const [addExistingType, setAddExistingType] = useState<'GROUP' | 'CHANNEL'>('GROUP');
+  const [addExistingOptions, setAddExistingOptions] = useState<any[]>([]);
+  const [userChannels, setUserChannels] = useState<any[]>([]);
+  const [memberQuery, setMemberQuery] = useState('');
+  const [memberResults, setMemberResults] = useState<any[]>([]);
+  const [memberSearching, setMemberSearching] = useState(false);
+
+  const normalizeId = (value: any) => (typeof value === 'string' ? value : value?._id || '');
+  const hasId = (list: any[] | undefined, id: string | undefined) => {
+    if (!id || !list?.length) return false;
+    return list.some((item) => normalizeId(item) === id);
+  };
+  const getChatName = (chat: any) => chat.groupName || chat.channelUsername || chat.groupUsername || 'Unnamed';
 
   const styles = StyleSheet.create({
     container: {
@@ -226,6 +253,63 @@ export default function CommunityDetailScreen() {
       color: colors.primaryForeground,
       fontSize: 15,
       fontWeight: '700',
+      padding: 4,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.3)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 24,
+    },
+    modalCard: {
+      width: '100%',
+      borderRadius: 16,
+      backgroundColor: colors.card,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: colors.foreground,
+      marginBottom: 12,
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      color: colors.foreground,
+      backgroundColor: colors.background,
+      marginBottom: 10,
+    },
+    modalActions: {
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 8,
+    },
+    modalAction: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 10,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.background,
+    },
+    modalActionPrimary: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    modalActionText: {
+      color: colors.foreground,
+      fontWeight: '600',
+    },
+    modalActionTextPrimary: {
+      color: colors.primaryForeground,
     },
   });
 
@@ -233,8 +317,52 @@ export default function CommunityDetailScreen() {
     if (communityId) {
       loadCommunity();
       fetchChats();
+      fetchUserChannels();
     }
   }, [communityId]);
+
+  // Reset member search state when modal closes
+  useEffect(() => {
+    if (!addMemberOpen) {
+      setMemberQuery('');
+      setMemberResults([]);
+      setMemberSearching(false);
+    }
+  }, [addMemberOpen]);
+
+  // Live user search for adding members (2+ chars, debounced)
+  useEffect(() => {
+    if (!addMemberOpen) return;
+    if (memberQuery.trim().length < 2) {
+      setMemberResults([]);
+      return;
+    }
+    const t = setTimeout(async () => {
+      setMemberSearching(true);
+      try {
+        const res = await userApi.searchUsers(memberQuery.trim());
+        const currentMemberIds = (currentCommunity?.members || []).map(normalizeId);
+        const filtered = (res.users || []).filter(u => !currentMemberIds.includes(u._id));
+        setMemberResults(filtered);
+      } catch (err) {
+        console.error('Search users failed', err);
+        setMemberResults([]);
+      } finally {
+        setMemberSearching(false);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [memberQuery, addMemberOpen, currentCommunity]);
+
+  const fetchUserChannels = async () => {
+    try {
+      const res = await channelApi.getUserChannels();
+      setUserChannels(res.channels || []);
+    } catch (err) {
+      console.error('Failed to fetch user channels', err);
+      setUserChannels([]);
+    }
+  };
 
   const loadCommunity = async () => {
     try {
@@ -250,6 +378,7 @@ export default function CommunityDetailScreen() {
     try {
       await loadCommunity();
       await fetchChats();
+      await fetchUserChannels();
     } finally {
       setRefreshing(false);
     }
@@ -303,35 +432,96 @@ export default function CommunityDetailScreen() {
 
   const handleAddChat = () => {
     const chatType = activeSection === 'groups' ? 'GROUP' : 'CHANNEL';
-    const availableChats = chats.filter(chat => {
-      if (chatType === 'GROUP') {
-        return chat.isGroup && !currentCommunity?.groups.includes(chat._id);
-      } else {
-        return chat.type === 'CHANNEL' && !currentCommunity?.channels.includes(chat._id);
-      }
-    });
+    const groupIds = (currentCommunity?.groups || []).map(normalizeId);
+    const channelIds = (currentCommunity?.channels || []).map(normalizeId);
+    const availableChats =
+      chatType === 'GROUP'
+        ? chats.filter(chat => chat.isGroup && !groupIds.includes(chat._id))
+        : userChannels.filter(channel => channel._id && !channelIds.includes(channel._id));
 
     if (availableChats.length === 0) {
       Alert.alert('No Chats', `No available ${activeSection} to add`);
       return;
     }
 
-    const options = availableChats.map(chat => ({
-      text: chat.groupName || chat.channelUsername || 'Unnamed',
-      onPress: async () => {
-        try {
-          await addChatToCommunity(communityId, chat._id, chatType);
-          Alert.alert('Success', `${chatType === 'GROUP' ? 'Group' : 'Channel'} added successfully`);
-          await loadCommunity();
-        } catch (error) {
-          Alert.alert('Error', `Failed to add ${chatType.toLowerCase()}`);
-        }
-      },
-    }));
+    setAddExistingType(chatType);
+    setAddExistingOptions(availableChats);
+    setAddExistingOpen(true);
+  };
 
-    options.push({ text: 'Cancel', onPress: async () => {} });
+  const handleGroupCreated = async (chat: any) => {
+    try {
+      if (!chat?._id) {
+        console.error('Group created but no ID returned');
+        Alert.alert('Error', 'Failed to create group');
+        return;
+      }
+      // Add the newly created group to the community
+      await addChatToCommunity(communityId as string, chat._id, 'GROUP');
+      // Refresh community data and chats list
+      await Promise.all([loadCommunity(), fetchChats()]);
+      Alert.alert('Success', 'Group created and added to community');
+    } catch (error) {
+      console.error('Failed to add group to community', error);
+      Alert.alert('Error', 'Group created but failed to add to community');
+    } finally {
+      setCreateGroupOpen(false);
+    }
+  };
 
-    Alert.alert(`Add ${chatType === 'GROUP' ? 'Group' : 'Channel'}`, 'Select a chat to add:', options);
+  const handleChannelCreated = async (channel: any) => {
+    try {
+      if (!channel?._id) {
+        console.error('Channel created but no ID returned');
+        Alert.alert('Error', 'Failed to create channel');
+        return;
+      }
+      // Add the newly created channel to the community
+      await addChatToCommunity(communityId as string, channel._id, 'CHANNEL');
+      // Refresh community data and chats list
+      await Promise.all([loadCommunity(), fetchChats(), fetchUserChannels()]);
+      Alert.alert('Success', 'Channel created and added to community');
+    } catch (error) {
+      console.error('Failed to add channel to community', error);
+      Alert.alert('Error', 'Channel created but failed to add to community');
+    } finally {
+      setCreateChannelOpen(false);
+    }
+  };
+
+  const handleAddMember = async () => {
+    if (!memberIdInput.trim()) {
+      Alert.alert('Missing user ID', 'Enter a user ID to add');
+      return;
+    }
+    try {
+      const updated = await useCommunityStore.getState().addMemberToCommunity(communityId as string, memberIdInput.trim());
+      if (updated) {
+        await loadCommunity();
+        setAddMemberOpen(false);
+        setMemberIdInput('');
+        Alert.alert('Success', 'Member added to community');
+      } else {
+        Alert.alert('Error', 'Failed to add member');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to add member');
+    }
+  };
+
+  const handleAddMemberSelect = async (userId: string) => {
+    try {
+      const updated = await useCommunityStore.getState().addMemberToCommunity(communityId as string, userId);
+      if (updated) {
+        await loadCommunity();
+        setAddMemberOpen(false);
+        setMemberQuery('');
+        setMemberResults([]);
+        Alert.alert('Success', 'Member added to community');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.message || 'Failed to add member');
+    }
   };
 
   const handleRemoveChat = async (chatId: string, chatName: string) => {
@@ -357,8 +547,76 @@ export default function CommunityDetailScreen() {
     );
   };
 
+  const handleAddExistingSelect = async (chatId: string, chatName: string) => {
+    try {
+      await addChatToCommunity(communityId, chatId, addExistingType);
+      console.log('Added existing chat to community:', chatId);
+      // Refresh community data and chats list
+      await Promise.all([loadCommunity(), fetchChats()]);
+      Alert.alert('Success', `${addExistingType === 'GROUP' ? 'Group' : 'Channel'} "${chatName}" added successfully`);
+      setAddExistingOpen(false);
+    } catch (error) {
+      console.error('Failed to add existing chat', error);
+      Alert.alert('Error', `Failed to add ${addExistingType === 'GROUP' ? 'group' : 'channel'}`);
+    }
+  };
+
   const handleChatPress = (chatId: string) => {
     router.push(`/chat/${chatId}` as any);
+  };
+
+  const openSettings = () => {
+    if (!currentCommunity) return;
+    setSettingsName(currentCommunity!.name || '');
+    setSettingsDescription(currentCommunity!.description || '');
+    setSettingsPublic(!!currentCommunity!.isPublic);
+    setSettingsInviteJoin(currentCommunity!.allowInviteLinkJoin !== false);
+    setSettingsOpen(true);
+  };
+
+  const saveSettings = async () => {
+    try {
+      if (!currentCommunity) {
+        Alert.alert('Error', 'Community not loaded');
+        return;
+      }
+      const updated = await useCommunityStore.getState().updateCommunity(communityId as string, {
+        name: settingsName.trim() || currentCommunity!.name,
+        description: settingsDescription.trim(),
+        isPublic: settingsPublic,
+        allowInviteLinkJoin: settingsInviteJoin,
+      });
+      if (updated) {
+        setSettingsOpen(false);
+        Alert.alert('Updated', 'Community settings updated');
+      } else {
+        Alert.alert('Error', 'Failed to update settings');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update settings');
+    }
+  };
+
+  const shareInviteLink = async () => {
+    try {
+      if (!currentCommunity) {
+        Alert.alert('Error', 'Community not loaded');
+        return;
+      }
+      if (!currentCommunity!.isPublic) {
+        Alert.alert('Private', 'Only public communities can be shared');
+        return;
+      }
+      if (currentCommunity!.allowInviteLinkJoin === false) {
+        Alert.alert('Disabled', 'Invite links are disabled for this community');
+        return;
+      }
+      const username = currentCommunity!.username || (communityId as string);
+      const link = `${process.env.EXPO_PUBLIC_WEB_URL || 'https://example.com'}/join/${username}`;
+      await Share.share({ message: `Join ${currentCommunity!.name}: ${link}`, url: link });
+    } catch (error) {
+      Alert.alert('Error', 'Unable to share invite link');
+    }
   };
 
   if (!currentCommunity || isCommunitiesLoading) {
@@ -370,16 +628,21 @@ export default function CommunityDetailScreen() {
     );
   }
 
-  const isMember = currentCommunity.members.includes(user?._id || '');
-  const isAdmin = currentCommunity.admins.includes(user?._id || '');
+  const memberIds = (currentCommunity.members || []).map(normalizeId);
+  const adminIds = (currentCommunity.admins || []).map(normalizeId);
+  const groupIds = (currentCommunity.groups || []).map(normalizeId);
+  const channelIds = (currentCommunity.channels || []).map(normalizeId);
 
-  const communityGroups = chats.filter(chat => 
-    chat.isGroup && currentCommunity.groups.includes(chat._id)
-  );
+  const isMember = hasId(memberIds, user?._id);
+  const isAdmin = hasId(adminIds, user?._id);
 
-  const communityChannels = chats.filter(chat => 
-    chat.type === 'CHANNEL' && currentCommunity.channels.includes(chat._id)
-  );
+  const communityGroups = (chats || [])
+    .filter(Boolean)
+    .filter((chat) => chat._id && chat.isGroup && groupIds.includes(chat._id));
+
+  const communityChannels = (userChannels || [])
+    .filter(Boolean)
+    .filter((channel) => channel._id && channelIds.includes(channel._id));
 
   const renderGroupItem = ({ item }: any) => (
     <TouchableOpacity style={styles.item} onPress={() => handleChatPress(item._id)}>
@@ -387,17 +650,19 @@ export default function CommunityDetailScreen() {
         {item.icon ? (
           <Image source={{ uri: item.icon }} style={styles.itemAvatarImage} />
         ) : (
-          <Text style={styles.itemAvatarText}>{(item.groupName || 'G').charAt(0).toUpperCase()}</Text>
+          <Text style={styles.itemAvatarText}>
+            {(item.groupName || item.groupUsername || 'G').charAt(0).toUpperCase()}
+          </Text>
         )}
       </View>
       <View style={styles.itemInfo}>
-        <Text style={styles.itemTitle}>{item.groupName || 'Unnamed Group'}</Text>
-        <Text style={styles.itemSubtitle}>{item.participants?.length || 0} members</Text>
+        <Text style={styles.itemTitle}>{item.groupName || item.groupUsername || 'Unnamed Group'}</Text>
+        <Text style={styles.itemSubtitle}>{item.participants?.length ?? 0} members</Text>
       </View>
       {isAdmin && (
         <TouchableOpacity 
           style={styles.removeButton} 
-          onPress={() => handleRemoveChat(item._id, item.groupName || 'Group')}
+          onPress={() => handleRemoveChat(item._id, item.groupName || item.groupUsername || 'Group')}
         >
           <Text style={styles.removeButtonText}>×</Text>
         </TouchableOpacity>
@@ -411,17 +676,23 @@ export default function CommunityDetailScreen() {
         {item.icon ? (
           <Image source={{ uri: item.icon }} style={styles.itemAvatarImage} />
         ) : (
-          <Text style={styles.itemAvatarText}>{(item.channelName || 'C').charAt(0).toUpperCase()}</Text>
+          <Text style={styles.itemAvatarText}>
+            {(item.groupName || item.channelUsername || item.groupUsername || 'C').charAt(0).toUpperCase()}
+          </Text>
         )}
       </View>
       <View style={styles.itemInfo}>
-        <Text style={styles.itemTitle}>{item.channelName || 'Unnamed Channel'}</Text>
-        <Text style={styles.itemSubtitle}>{item.subscribers?.length || 0} subscribers</Text>
+        <Text style={styles.itemTitle}>
+          {item.groupName || item.channelUsername || item.groupUsername || 'Unnamed Channel'}
+        </Text>
+        <Text style={styles.itemSubtitle}>
+          {(item.subscriberCount ?? item.participants?.length ?? 0)} subscribers
+        </Text>
       </View>
       {isAdmin && (
         <TouchableOpacity 
           style={styles.removeButton} 
-          onPress={() => handleRemoveChat(item._id, item.channelName || 'Channel')}
+          onPress={() => handleRemoveChat(item._id, item.groupName || item.channelUsername || 'Channel')}
         >
           <Text style={styles.removeButtonText}>×</Text>
         </TouchableOpacity>
@@ -443,7 +714,7 @@ export default function CommunityDetailScreen() {
       <View style={styles.itemInfo}>
         <Text style={styles.itemTitle}>{item.displayName || item.username || 'User'}</Text>
         <Text style={styles.itemSubtitle}>
-          {currentCommunity.admins.includes(item._id) ? '👑 Admin' : 'Member'}
+          {hasId(adminIds, item._id) ? '👑 Admin' : 'Member'}
         </Text>
       </View>
     </View>
@@ -493,7 +764,7 @@ export default function CommunityDetailScreen() {
           <View style={styles.communityInfo}>
             <Text style={styles.communityName}>{currentCommunity.name}</Text>
             <Text style={styles.communityStats}>
-              {currentCommunity.members.length} members • {currentCommunity.groups.length + currentCommunity.channels.length} chats
+              {memberIds.length} members • {groupIds.length + channelIds.length} chats
             </Text>
             {currentCommunity.isPublic && (
               <Text style={styles.communityStats}>🌐 Public Community</Text>
@@ -511,14 +782,27 @@ export default function CommunityDetailScreen() {
               style={[styles.actionButton, styles.actionButtonDanger]}
               onPress={handleDelete}
             >
-              <Text style={[styles.actionButtonText, styles.actionButtonTextPrimary]}>
-                Delete
-              </Text>
+              <Text style={[styles.actionButtonText, styles.actionButtonTextPrimary]}>Delete</Text>
             </TouchableOpacity>
           )}
           {isMember && !isAdmin && (
             <TouchableOpacity style={styles.actionButton} onPress={handleLeave}>
               <Text style={styles.actionButtonText}>Leave</Text>
+            </TouchableOpacity>
+          )}
+          {isAdmin && (
+            <TouchableOpacity style={styles.actionButton} onPress={shareInviteLink}>
+              <Text style={styles.actionButtonText}>Share</Text>
+            </TouchableOpacity>
+          )}
+          {isAdmin && (
+            <TouchableOpacity style={[styles.actionButton, styles.actionButtonPrimary]} onPress={() => setAddMemberOpen(true)}>
+              <Text style={[styles.actionButtonText, styles.actionButtonTextPrimary]}>Members</Text>
+            </TouchableOpacity>
+          )}
+          {isAdmin && (
+            <TouchableOpacity style={styles.actionButton} onPress={openSettings}>
+              <Text style={styles.actionButtonText}>Settings</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -546,7 +830,7 @@ export default function CommunityDetailScreen() {
           onPress={() => setActiveSection('members')}
         >
           <Text style={[styles.tabText, activeSection === 'members' && styles.tabTextActive]}>
-            Members ({currentCommunity.members.length})
+            Members ({memberIds.length})
           </Text>
         </TouchableOpacity>
       </View>
@@ -567,20 +851,189 @@ export default function CommunityDetailScreen() {
             }
           />
           {isAdmin && (
-            <TouchableOpacity style={styles.addButton} onPress={handleAddChat}>
-              <Text style={styles.addButtonText}>
-                + Add {activeSection === 'groups' ? 'Group' : 'Channel'}
-              </Text>
-            </TouchableOpacity>
+            <>
+              {activeSection === 'groups' && (
+                <View>
+                  <TouchableOpacity style={styles.addButton} onPress={() => setCreateGroupOpen(true)}>
+                    <Text style={styles.addButtonText}>+ New Group</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.addButton} onPress={handleAddChat}>
+                    <Text style={styles.addButtonText}>+ Add Group</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              {activeSection === 'channels' && (
+                <View>
+                  <TouchableOpacity style={styles.addButton} onPress={() => setCreateChannelOpen(true)}>
+                    <Text style={styles.addButtonText}>+ New Channel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.addButton} onPress={handleAddChat}>
+                    <Text style={styles.addButtonText}>+ Add Channel</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </>
           )}
         </>
       ) : (
         <View style={styles.center}>
           <Text style={styles.emptyText}>
-            {currentCommunity.members.length} member{currentCommunity.members.length !== 1 ? 's' : ''} in this community
+            {memberIds.length} member{memberIds.length !== 1 ? 's' : ''} in this community
           </Text>
+          {isAdmin && (
+            <TouchableOpacity style={[styles.addButton]} onPress={() => setAddMemberOpen(true)}>
+              <Text style={styles.addButtonText}>+ Add Members</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
+
+      <GroupCreateModal
+        visible={createGroupOpen}
+        onClose={() => setCreateGroupOpen(false)}
+        onCreated={handleGroupCreated}
+      />
+
+      <ChannelCreateModal
+        visible={createChannelOpen}
+        onClose={() => setCreateChannelOpen(false)}
+        onCreated={handleChannelCreated}
+      />
+
+      <Modal transparent visible={addExistingOpen} animationType="fade" onRequestClose={() => setAddExistingOpen(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>
+              Add {addExistingType === 'GROUP' ? 'Group' : 'Channel'}
+            </Text>
+            <View style={{ maxHeight: 320 }}>
+              <FlatList
+                data={addExistingOptions}
+                keyExtractor={(item) => item._id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={[styles.item, { marginHorizontal: 0, marginVertical: 4 }]}
+                    onPress={() => handleAddExistingSelect(item._id, getChatName(item))}
+                  >
+                    <View style={styles.itemAvatar}>
+                      {item.icon ? (
+                        <Image source={{ uri: item.icon }} style={styles.itemAvatarImage} />
+                      ) : (
+                        <Text style={styles.itemAvatarText}>
+                          {(getChatName(item).charAt(0) || 'U').toUpperCase()}
+                        </Text>
+                      )}
+                    </View>
+                    <View style={styles.itemInfo}>
+                      <Text style={styles.itemTitle}>{getChatName(item)}</Text>
+                      <Text style={styles.itemSubtitle}>
+                        {addExistingType === 'GROUP'
+                          ? `${item.participants?.length ?? 0} members`
+                          : `${item.subscriberCount ?? item.participants?.length ?? 0} subscribers`}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
+                ListEmptyComponent={
+                  <View style={styles.center}>
+                    <Text style={styles.emptyText}>No available chats to add</Text>
+                  </View>
+                }
+              />
+            </View>
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalAction} onPress={() => setAddExistingOpen(false)}>
+                <Text style={styles.modalActionText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal transparent visible={addMemberOpen} animationType="fade" onRequestClose={() => setAddMemberOpen(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Add Members</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Search users (2+ chars)"
+              placeholderTextColor={colors.mutedForeground}
+              value={memberQuery}
+              onChangeText={setMemberQuery}
+            />
+            {memberSearching ? (
+              <View style={{ paddingVertical: 12, alignItems: 'center' }}>
+                <ActivityIndicator color={colors.primary} />
+              </View>
+            ) : (
+              <FlatList
+                data={memberResults}
+                keyExtractor={(item) => item._id}
+                style={{ maxHeight: 280 }}
+                renderItem={({ item }) => (
+                  <View style={[styles.item, { marginHorizontal: 0, marginVertical: 6 }]}>
+                    <View style={styles.itemInfo}>
+                      <Text style={styles.itemTitle}>{item.name}</Text>
+                      {item.username && (
+                        <Text style={styles.itemSubtitle}>@{item.username}</Text>
+                      )}
+                    </View>
+                    <TouchableOpacity style={[styles.modalAction, styles.modalActionPrimary, { paddingVertical: 8, minWidth: 80 }]} onPress={() => handleAddMemberSelect(item._id)}>
+                      <Text style={[styles.modalActionText, styles.modalActionTextPrimary]}>Add</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+                ListEmptyComponent={
+                  <View style={{ paddingVertical: 12, alignItems: 'center' }}>
+                    <Text style={styles.emptyText}>No users found</Text>
+                  </View>
+                }
+              />
+            )}
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalAction} onPress={() => setAddMemberOpen(false)}>
+                <Text style={styles.modalActionText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal transparent visible={settingsOpen} animationType="fade" onRequestClose={() => setSettingsOpen(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Community Settings</Text>
+            <TextInput style={styles.input} placeholder="Name" placeholderTextColor={colors.mutedForeground} value={settingsName} onChangeText={setSettingsName} />
+            <TextInput style={styles.input} placeholder="Description" placeholderTextColor={colors.mutedForeground} value={settingsDescription} onChangeText={setSettingsDescription} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <Text style={{ color: colors.foreground }}>Public</Text>
+              <TouchableOpacity
+                style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: settingsPublic ? colors.primary : colors.background }}
+                onPress={() => setSettingsPublic(!settingsPublic)}
+              >
+                <Text style={{ color: settingsPublic ? colors.primaryForeground : colors.foreground }}>{settingsPublic ? 'Yes' : 'No'}</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <Text style={{ color: colors.foreground }}>Allow Invite Link Join</Text>
+              <TouchableOpacity
+                style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: settingsInviteJoin ? colors.primary : colors.background }}
+                onPress={() => setSettingsInviteJoin(!settingsInviteJoin)}
+              >
+                <Text style={{ color: settingsInviteJoin ? colors.primaryForeground : colors.foreground }}>{settingsInviteJoin ? 'Yes' : 'No'}</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalAction} onPress={() => setSettingsOpen(false)}>
+                <Text style={styles.modalActionText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalAction, styles.modalActionPrimary]} onPress={saveSettings}>
+                <Text style={[styles.modalActionText, styles.modalActionTextPrimary]}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

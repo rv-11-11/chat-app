@@ -26,6 +26,8 @@ interface CommunityState {
 	leaveCommunity: (communityId: string) => Promise<void>;
 	deleteCommunity: (communityId: string) => Promise<boolean>;
 
+	updateCommunity: (communityId: string, data: Partial<{ name: string; description?: string; icon?: string; isPublic?: boolean; allowInviteLinkJoin?: boolean }>) => Promise<CommunityType | null>;
+
 	addCommunity: (community: CommunityType) => void;
 }
 
@@ -221,6 +223,20 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
 		} catch (error) {
 			console.error('Failed to delete community:', error);
 			return false;
+		}
+	},
+
+	updateCommunity: async (communityId, data) => {
+		try {
+			const response = await communityApi.updateCommunity(communityId, data);
+			set({ currentCommunity: response.community });
+			set((state) => ({
+				communities: state.communities.map((c) => (c._id === response.community._id ? response.community : c)),
+			}));
+			return response.community;
+		} catch (error) {
+			console.error('Failed to update community:', error);
+			return null;
 		}
 	},
 

@@ -162,7 +162,6 @@ const Home = () => {
         setIsSearching(false);
       }
     }, 300);
-    return () => clearTimeout(timer);
   }, [searchQuery]);
 
   // Fetch discover channels when tab is switched
@@ -209,39 +208,6 @@ const Home = () => {
       
       await fetchUserChannels();
     } catch (error: any) {
-      console.error('Failed to subscribe:', error);
-    } finally {
-      setSubscribingChannels((prev) => {
-        const next = new Set(prev);
-        next.delete(channelId);
-        return next;
-      });
-    }
-  };
-
-  const handleUnsubscribeFromChannel = async (channelId: string) => {
-    setSubscribingChannels((prev) => new Set(prev).add(channelId));
-    try {
-      await apiClient.post(`/channel/${channelId}/unsubscribe`);
-      
-      setDiscoverChannels((prev) =>
-        prev.map((ch) => {
-          if (ch._id === channelId) {
-            return {
-              ...ch,
-              participants: (ch.participants || []).filter((p: any) => {
-                const participantId = typeof p === 'string' ? p : p._id;
-                return participantId?.toString() !== currentUserId?.toString();
-              }),
-              subscriberCount: Math.max((ch.subscriberCount || 0) - 1, 0),
-            };
-          }
-          return ch;
-        })
-      );
-      
-      await fetchUserChannels();
-    } catch (error: any) {
       console.error('Failed to unsubscribe:', error);
     } finally {
       setSubscribingChannels((prev) => {
@@ -259,27 +225,24 @@ const Home = () => {
   // Filter items based on search query
   const homeItems = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
+    const safeTime = (entry: any) => {
+      const ts = entry?.item?.lastMessage?.createdAt;
+      return ts ? new Date(ts).getTime() : 0;
+    };
     
     if (!q) {
       const items = [
-        ...(chats || []).map((c) => ({ kind: 'chat' as const, item: c })),
-        ...(channels || []).map((c) => ({ kind: 'channel' as const, item: c })),
-      ];
+        ...(chats || []).filter(Boolean).map((c) => ({ kind: 'chat' as const, item: c })),
+        ...(channels || []).filter(Boolean).map((c) => ({ kind: 'channel' as const, item: c })),
+      ].filter((entry) => entry?.item);
       
-      return items.sort((a, b) => {
-        const aTime = a.item.lastMessage?.createdAt
-          ? new Date(a.item.lastMessage.createdAt).getTime()
-          : 0;
-        const bTime = b.item.lastMessage?.createdAt
-          ? new Date(b.item.lastMessage.createdAt).getTime()
-          : 0;
-        return bTime - aTime;
-      });
+      return items.sort((a, b) => safeTime(b) - safeTime(a));
     }
     
     const searchTerm = q.startsWith('@') ? q.slice(1) : q;
     
     const matchedChats = (chats || [])
+      .filter(Boolean)
       .filter((chat) => {
         if (chat.type === 'GROUP') {
           const name = (chat.groupName || '').toLowerCase();
@@ -292,6 +255,7 @@ const Home = () => {
       .map((c) => ({ kind: 'chat' as const, item: c }));
     
     const matchedChannels = (channels || [])
+      .filter(Boolean)
       .filter((ch) => {
         const name = (ch.groupName || ch.name || '').toLowerCase();
         const username = (ch.channelUsername || '').toLowerCase();
@@ -299,51 +263,39 @@ const Home = () => {
       })
       .map((c) => ({ kind: 'channel' as const, item: c }));
     
-    const merged = [...matchedChats, ...matchedChannels];
-    return merged.sort((a, b) => {
-      const aTime = a.item.lastMessage?.createdAt
-        ? new Date(a.item.lastMessage.createdAt).getTime()
-        : 0;
-      const bTime = b.item.lastMessage?.createdAt
-        ? new Date(b.item.lastMessage.createdAt).getTime()
-        : 0;
-      return bTime - aTime;
-    });
+    const merged = [...matchedChats, ...matchedChannels].filter((entry) => entry?.item);
+    return merged.sort((a, b) => safeTime(b) - safeTime(a));
   }, [chats, channels, searchQuery]);
 
   const combinedItems = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
+    const safeTime = (entry: any) => {
+      const ts = entry?.item?.lastMessage?.createdAt;
+      return ts ? new Date(ts).getTime() : 0;
+    };
     
     if (!q) {
       const items = [
-        ...(chats || []).map((c) => ({ kind: 'chat' as const, item: c })),
-        ...(channels || []).map((c) => ({ kind: 'channel' as const, item: c })),
-      ];
+        ...(chats || []).filter(Boolean).map((c) => ({ kind: 'chat' as const, item: c })),
+        ...(channels || []).filter(Boolean).map((c) => ({ kind: 'channel' as const, item: c })),
+      ].filter((entry) => entry?.item);
       
-      return items.sort((a, b) => {
-        const aTime = a.item.lastMessage?.createdAt
-          ? new Date(a.item.lastMessage.createdAt).getTime()
-          : 0;
-        const bTime = b.item.lastMessage?.createdAt
-          ? new Date(b.item.lastMessage.createdAt).getTime()
-          : 0;
-        return bTime - aTime;
-      });
+      return items.sort((a, b) => safeTime(b) - safeTime(a));
     }
     
-    const matchedUsers = globalSearchResults.users.map((u: any) => ({
+    const matchedUsers = (globalSearchResults.users || []).filter(Boolean).map((u: any) => ({
       kind: 'user' as const,
       item: u,
     }));
-    const matchedChannels = globalSearchResults.channels.map((c: any) => ({
+    const matchedChannels = (globalSearchResults.channels || []).filter(Boolean).map((c: any) => ({
       kind: 'channel' as const,
       item: c,
     }));
-    const matchedCommunities = globalSearchResults.communities.map((c: any) => ({
+    const matchedCommunities = (globalSearchResults.communities || []).filter(Boolean).map((c: any) => ({
       kind: 'community' as const,
       item: c,
     }));
-    const matchedGroups = globalSearchResults.groups.map((c: any) => ({
+    const matchedGroups = (globalSearchResults.groups || []).filter(Boolean).map((c: any) => ({
       kind: 'chat' as const,
       item: c,
     }));
@@ -364,16 +316,8 @@ const Home = () => {
       ...matchedCommunities,
       ...matchedGroups,
       ...matchedPrivateChats,
-    ];
-    return merged.sort((a, b) => {
-      const aTime = a.item.lastMessage?.createdAt
-        ? new Date(a.item.lastMessage.createdAt).getTime()
-        : 0;
-      const bTime = b.item.lastMessage?.createdAt
-        ? new Date(b.item.lastMessage.createdAt).getTime()
-        : 0;
-      return bTime - aTime;
-    });
+    ].filter((entry) => entry?.item);
+    return merged.sort((a, b) => safeTime(b) - safeTime(a));
   }, [chats, channels, searchQuery, globalSearchResults]);
 
   const styles = StyleSheet.create({

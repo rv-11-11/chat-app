@@ -6,8 +6,8 @@ const getEnvVar = (key: string, defaultValue?: string): string => {
 };
 
 export const ENV = {
-  API_URL: getEnvVar('apiUrl', 'http://localhost:8000'),
-  SOCKET_URL: getEnvVar('socketUrl', 'http://localhost:8000'),
+  API_URL: getEnvVar('apiUrl', 'http://localhost:9000'),
+  SOCKET_URL: getEnvVar('socketUrl', 'http://localhost:9000'),
   CLOUDINARY_CLOUD_NAME: getEnvVar('CLOUDINARY_CLOUD_NAME', ''),
   CLOUDINARY_API_KEY: getEnvVar('CLOUDINARY_API_KEY', ''),
   NODE_ENV: getEnvVar('NODE_ENV', 'development'),
