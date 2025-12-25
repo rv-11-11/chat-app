@@ -107,10 +107,8 @@ if (Env.NODE_ENV === "production") {
 
 app.use(errorHandler);
 
-const PORT = Number(Env.PORT);
-server.listen(PORT, '0.0.0.0', async () => {
+
+server.listen(Env.PORT, async () => {
   await connectDatabase();
-  console.log(`Server running on port ${PORT} in ${Env.NODE_ENV} mode`);
-  console.log(`Server accessible at http://0.0.0.0:${PORT}`);
-  console.log(`For physical devices, use your local IP address`);
+  console.log(`Server running on port ${Env.PORT} in ${Env.NODE_ENV} mode`);
 });

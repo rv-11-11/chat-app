@@ -13,6 +13,8 @@ export const userApi = {
     email: string;
     phone?: string;
     avatar?: string;
+    isOnlineVisible?: boolean;
+    readReceipts?: boolean;
   }): Promise<{ user: User }> => {
     const response = await apiClient.put<{ user: User }>('/users/profile', data);
     return response.data;

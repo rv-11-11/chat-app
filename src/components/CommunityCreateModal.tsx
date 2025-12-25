@@ -1,8 +1,9 @@
 import * as ImagePicker from 'expo-image-picker';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useCommunityStore } from '../store/communityStore';
 import { useThemeColors } from '../utils/theme';
+import { SmartImage } from './SmartImage';
 
 interface Props {
   visible: boolean;
@@ -193,6 +194,13 @@ export default function CommunityCreateModal({ visible, onClose }: Props) {
       });
       if (!res.canceled && res.assets && res.assets.length > 0) {
         const asset = res.assets[0];
+        
+        // Check file size (limit to 5MB)
+        if (asset.fileSize && asset.fileSize > 5 * 1024 * 1024) {
+          Alert.alert('Error', 'Image too large. Maximum size is 5MB.');
+          return;
+        }
+
         if (asset.base64) {
           setIconUri(`data:image/jpeg;base64,${asset.base64}`);
         } else if (asset.uri) {
@@ -269,7 +277,11 @@ export default function CommunityCreateModal({ visible, onClose }: Props) {
               <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
                 {iconUri ? (
                   <>
-                    <Image source={{ uri: iconUri }} style={styles.imagePreview} />
+                    <SmartImage 
+                      source={iconUri} 
+                      style={styles.imagePreview} 
+                      contentFit="cover"
+                    />
                     <Text style={styles.imagePickerText}>Tap to change</Text>
                   </>
                 ) : (

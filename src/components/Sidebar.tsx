@@ -14,6 +14,7 @@ import { useSocketStore } from '../store/socketStore';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Avatar } from './Avatar';
 
 interface MenuItem {
   icon: string;

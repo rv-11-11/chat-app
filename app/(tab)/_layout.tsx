@@ -18,6 +18,17 @@ const TabRoot =() => {
                     ),
                 }}
             />
+
+            <Tabs.Screen 
+                name="discover"
+                options={{
+                    title: "Discover",
+                    headerShown: false,
+                    tabBarIcon: ({ color }) => (
+                        <FontAwesome name="compass" size={24} color={color} />
+                    ),
+                }}
+            />
             
             <Tabs.Screen 
                 name="chat"

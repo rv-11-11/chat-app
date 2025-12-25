@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Image, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View, Modal, TextInput, Share } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View, Modal, TextInput, Share } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import "../../global.css";
 import { useAuthStore } from '../../src/store/authStore';
@@ -11,6 +11,8 @@ import GroupCreateModal from '../../src/components/GroupCreateModal';
 import ChannelCreateModal from '../../src/components/ChannelCreateModal';
 import { channelApi } from '../../src/services/api/channel';
 import { userApi } from '../../src/services/api/user';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Avatar } from '../../src/components/Avatar';
 
 export default function CommunityDetailScreen() {
   const insets = useSafeAreaInsets();
@@ -38,6 +40,7 @@ export default function CommunityDetailScreen() {
   const [memberQuery, setMemberQuery] = useState('');
   const [memberResults, setMemberResults] = useState<any[]>([]);
   const [memberSearching, setMemberSearching] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const normalizeId = (value: any) => (typeof value === 'string' ? value : value?._id || '');
   const hasId = (list: any[] | undefined, id: string | undefined) => {
@@ -72,29 +75,36 @@ export default function CommunityDetailScreen() {
       fontSize: 24,
       color: colors.primary,
     },
+    headerTopRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 12,
+    },
+    headerActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    headerActionBtn: {
+      padding: 8,
+      borderRadius: 10,
+      minWidth: 40,
+      minHeight: 40,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
     communityHeader: {
       flexDirection: 'row',
       alignItems: 'center',
       marginBottom: 16,
     },
     communityIcon: {
-      width: 80,
-      height: 80,
-      borderRadius: 40,
-      backgroundColor: colors.primary,
-      justifyContent: 'center',
-      alignItems: 'center',
+      position: 'relative',
       marginRight: 16,
-    },
-    communityIconImage: {
-      width: 80,
-      height: 80,
-      borderRadius: 40,
-    },
-    communityIconText: {
-      fontSize: 32,
-      fontWeight: '800',
-      color: colors.primaryForeground,
     },
     communityInfo: {
       flex: 1,
@@ -186,25 +196,6 @@ export default function CommunityDetailScreen() {
       backgroundColor: colors.card,
       borderWidth: 1,
       borderColor: colors.border,
-    },
-    itemAvatar: {
-      width: 50,
-      height: 50,
-      borderRadius: 25,
-      backgroundColor: colors.primary,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginRight: 12,
-    },
-    itemAvatarImage: {
-      width: 50,
-      height: 50,
-      borderRadius: 25,
-    },
-    itemAvatarText: {
-      color: colors.primaryForeground,
-      fontSize: 18,
-      fontWeight: '700',
     },
     itemInfo: {
       flex: 1,
@@ -310,6 +301,34 @@ export default function CommunityDetailScreen() {
     },
     modalActionTextPrimary: {
       color: colors.primaryForeground,
+    },
+    menuCard: {
+      position: 'absolute',
+      top: 60,
+      right: 16,
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingVertical: 8,
+      width: 220,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 10,
+      elevation: 4,
+    },
+    menuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      gap: 8,
+    },
+    menuItemText: {
+      color: colors.foreground,
+      fontSize: 14,
+      fontWeight: '600',
     },
   });
 
@@ -646,14 +665,13 @@ export default function CommunityDetailScreen() {
 
   const renderGroupItem = ({ item }: any) => (
     <TouchableOpacity style={styles.item} onPress={() => handleChatPress(item._id)}>
-      <View style={styles.itemAvatar}>
-        {item.icon ? (
-          <Image source={{ uri: item.icon }} style={styles.itemAvatarImage} />
-        ) : (
-          <Text style={styles.itemAvatarText}>
-            {(item.groupName || item.groupUsername || 'G').charAt(0).toUpperCase()}
-          </Text>
-        )}
+      <View style={{ marginRight: 12 }}>
+        <Avatar
+          uri={item.icon}
+          name={item.groupName || item.groupUsername || 'G'}
+          size={50}
+          shape="rounded"
+        />
       </View>
       <View style={styles.itemInfo}>
         <Text style={styles.itemTitle}>{item.groupName || item.groupUsername || 'Unnamed Group'}</Text>
@@ -672,14 +690,13 @@ export default function CommunityDetailScreen() {
 
   const renderChannelItem = ({ item }: any) => (
     <TouchableOpacity style={styles.item} onPress={() => handleChatPress(item._id)}>
-      <View style={styles.itemAvatar}>
-        {item.icon ? (
-          <Image source={{ uri: item.icon }} style={styles.itemAvatarImage} />
-        ) : (
-          <Text style={styles.itemAvatarText}>
-            {(item.groupName || item.channelUsername || item.groupUsername || 'C').charAt(0).toUpperCase()}
-          </Text>
-        )}
+      <View style={{ marginRight: 12 }}>
+        <Avatar
+          uri={item.icon}
+          name={item.groupName || item.channelUsername || item.groupUsername || 'C'}
+          size={50}
+          shape="rounded"
+        />
       </View>
       <View style={styles.itemInfo}>
         <Text style={styles.itemTitle}>
@@ -702,14 +719,12 @@ export default function CommunityDetailScreen() {
 
   const renderMemberItem = ({ item }: any) => (
     <View style={styles.item}>
-      <View style={styles.itemAvatar}>
-        {item.profilePicture ? (
-          <Image source={{ uri: item.profilePicture }} style={styles.itemAvatarImage} />
-        ) : (
-          <Text style={styles.itemAvatarText}>
-            {(item.displayName || item.username || 'U').charAt(0).toUpperCase()}
-          </Text>
-        )}
+      <View style={{ marginRight: 12 }}>
+        <Avatar
+          uri={item.profilePicture}
+          name={item.displayName || item.username || 'U'}
+          size={50}
+        />
       </View>
       <View style={styles.itemInfo}>
         <Text style={styles.itemTitle}>{item.displayName || item.username || 'User'}</Text>
@@ -747,19 +762,65 @@ export default function CommunityDetailScreen() {
           />
         }
       >
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backText}>←</Text>
-        </TouchableOpacity>
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity style={styles.headerActionBtn} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={22} color={colors.primary} />
+          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.headerActionBtn} onPress={() => setCreateGroupOpen(true)}>
+              <MaterialIcons name="group-add" size={20} color={colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.headerActionBtn} onPress={() => setCreateChannelOpen(true)}>
+              <MaterialIcons name="add-comment" size={20} color={colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.headerActionBtn} onPress={() => setMenuOpen((v) => !v)}>
+              <MaterialIcons name="more-vert" size={20} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+        {menuOpen && (
+          <View style={styles.menuCard}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuOpen(false); }}>
+              <Ionicons name="information-circle-outline" size={18} color={colors.foreground} />
+              <Text style={styles.menuItemText}>Community info</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuOpen(false); setActiveSection('members'); }}>
+              <Ionicons name="people-outline" size={18} color={colors.foreground} />
+              <Text style={styles.menuItemText}>View members</Text>
+            </TouchableOpacity>
+            {isMember && !isAdmin && (
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuOpen(false); handleLeave(); }}>
+                <Ionicons name="exit-outline" size={18} color={colors.accent} />
+                <Text style={[styles.menuItemText, { color: colors.accent }]}>Exit community</Text>
+              </TouchableOpacity>
+            )}
+            {isAdmin && (
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuOpen(false); openSettings(); }}>
+                <Ionicons name="settings-outline" size={18} color={colors.foreground} />
+                <Text style={styles.menuItemText}>Settings</Text>
+              </TouchableOpacity>
+            )}
+            {isAdmin && (
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuOpen(false); handleDelete(); }}>
+                <Ionicons name="trash-outline" size={18} color={colors.accent} />
+                <Text style={[styles.menuItemText, { color: colors.accent }]}>Delete</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuOpen(false); shareInviteLink(); }}>
+              <Ionicons name="share-outline" size={18} color={colors.foreground} />
+              <Text style={styles.menuItemText}>Share</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         <View style={styles.communityHeader}>
-          <View style={styles.communityIcon}>
-            {currentCommunity.icon ? (
-              <Image source={{ uri: currentCommunity.icon }} style={styles.communityIconImage} />
-            ) : (
-              <Text style={styles.communityIconText}>
-                {currentCommunity.name.charAt(0).toUpperCase()}
-              </Text>
-            )}
+          <View style={{ marginRight: 16 }}>
+            <Avatar
+              uri={currentCommunity.icon}
+              name={currentCommunity.name}
+              size={64}
+              shape="rounded"
+            />
           </View>
           <View style={styles.communityInfo}>
             <Text style={styles.communityName}>{currentCommunity.name}</Text>
@@ -776,34 +837,59 @@ export default function CommunityDetailScreen() {
           <Text style={styles.communityDescription}>{currentCommunity.description}</Text>
         )}
 
-        <View style={styles.actionButtons}>
+        <View style={styles.actionIconRow}>
           {isAdmin && (
             <TouchableOpacity
-              style={[styles.actionButton, styles.actionButtonDanger]}
+              style={styles.actionIconBtn}
               onPress={handleDelete}
+              accessibilityRole="button"
+              accessibilityLabel="Delete community"
             >
-              <Text style={[styles.actionButtonText, styles.actionButtonTextPrimary]}>Delete</Text>
+              <Ionicons name="trash-outline" size={18} color={colors.accent} />
+              <Text style={[styles.actionIconLabel, { color: colors.accent }]}>Delete</Text>
             </TouchableOpacity>
           )}
           {isMember && !isAdmin && (
-            <TouchableOpacity style={styles.actionButton} onPress={handleLeave}>
-              <Text style={styles.actionButtonText}>Leave</Text>
+            <TouchableOpacity
+              style={styles.actionIconBtn}
+              onPress={handleLeave}
+              accessibilityRole="button"
+              accessibilityLabel="Leave community"
+            >
+              <Ionicons name="exit-outline" size={18} color={colors.accent} />
+              <Text style={[styles.actionIconLabel, { color: colors.accent }]}>Leave</Text>
             </TouchableOpacity>
           )}
           {isAdmin && (
-            <TouchableOpacity style={styles.actionButton} onPress={shareInviteLink}>
-              <Text style={styles.actionButtonText}>Share</Text>
-            </TouchableOpacity>
-          )}
-          {isAdmin && (
-            <TouchableOpacity style={[styles.actionButton, styles.actionButtonPrimary]} onPress={() => setAddMemberOpen(true)}>
-              <Text style={[styles.actionButtonText, styles.actionButtonTextPrimary]}>Members</Text>
-            </TouchableOpacity>
-          )}
-          {isAdmin && (
-            <TouchableOpacity style={styles.actionButton} onPress={openSettings}>
-              <Text style={styles.actionButtonText}>Settings</Text>
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity
+                style={styles.actionIconBtn}
+                onPress={shareInviteLink}
+                accessibilityRole="button"
+                accessibilityLabel="Share invite link"
+              >
+                <Ionicons name="share-outline" size={18} color={colors.foreground} />
+                <Text style={styles.actionIconLabel}>Share</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.actionIconBtn}
+                onPress={() => setActiveSection('members')}
+                accessibilityRole="button"
+                accessibilityLabel="View members"
+              >
+                <Ionicons name="people-outline" size={18} color={colors.foreground} />
+                <Text style={styles.actionIconLabel}>Members</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.actionIconBtn}
+                onPress={openSettings}
+                accessibilityRole="button"
+                accessibilityLabel="Community settings"
+              >
+                <Ionicons name="settings-outline" size={18} color={colors.foreground} />
+                <Text style={styles.actionIconLabel}>Settings</Text>
+              </TouchableOpacity>
+            </>
           )}
         </View>
       </ScrollView>
@@ -915,14 +1001,13 @@ export default function CommunityDetailScreen() {
                     style={[styles.item, { marginHorizontal: 0, marginVertical: 4 }]}
                     onPress={() => handleAddExistingSelect(item._id, getChatName(item))}
                   >
-                    <View style={styles.itemAvatar}>
-                      {item.icon ? (
-                        <Image source={{ uri: item.icon }} style={styles.itemAvatarImage} />
-                      ) : (
-                        <Text style={styles.itemAvatarText}>
-                          {(getChatName(item).charAt(0) || 'U').toUpperCase()}
-                        </Text>
-                      )}
+                    <View style={{ marginRight: 12 }}>
+                      <Avatar
+                        uri={item.icon}
+                        name={getChatName(item)}
+                        size={50}
+                        shape="rounded"
+                      />
                     </View>
                     <View style={styles.itemInfo}>
                       <Text style={styles.itemTitle}>{getChatName(item)}</Text>

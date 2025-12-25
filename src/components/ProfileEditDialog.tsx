@@ -6,16 +6,18 @@ import {
   TouchableOpacity,
   TextInput,
   StyleSheet,
-  Image,
   ActivityIndicator,
   ScrollView,
   Alert,
+  Switch,
 } from 'react-native';
 import { useAuthStore } from '../store/authStore';
 import { userApi } from '../services/api/user';
 import { useThemeColors } from '../utils/theme';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { Ionicons, FontAwesome } from '@expo/vector-icons';
+import { Avatar } from './Avatar';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 
 interface ProfileEditDialogProps {
   isOpen: boolean;
@@ -30,6 +32,8 @@ export default function ProfileEditDialog({ isOpen, onClose }: ProfileEditDialog
     username: '',
     email: '',
     phone: '',
+    isOnlineVisible: true,
+    readReceipts: true,
   });
   const [previewUrl, setPreviewUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -54,15 +58,44 @@ export default function ProfileEditDialog({ isOpen, onClose }: ProfileEditDialog
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.8,
+        quality: 0.5,
         base64: true,
       });
 
       if (!result.canceled && result.assets[0]) {
-        const base64 = `data:image/jpeg;base64,${result.assets[0].base64}`;
-        setPreviewUrl(base64);
+        const asset = result.assets[0];
+        
+        // Check file size (limit to 5MB)
+        if (asset.fileSize && asset.fileSize > 5 * 1024 * 1024) {
+          Alert.alert('Error', 'Image too large. Maximum size is 5MB.');
+          return;
+        }
+
+        let base64 = asset.base64;
+        
+        // Fallback if base64 is missing
+        if (!base64 && asset.uri) {
+          try {
+            base64 = await FileSystem.readAsStringAsync(asset.uri, { 
+              encoding: FileSystem.EncodingType.Base64 
+            });
+          } catch (readError) {
+            console.error('Failed to read image:', readError);
+            Alert.alert('Error', 'Failed to process image');
+            return;
+          }
+        }
+
+        if (base64) {
+          // Ensure data URI prefix
+          const dataUri = base64.startsWith('data:') 
+            ? base64 
+            : `data:image/jpeg;base64,${base64}`;
+          setPreviewUrl(dataUri);
+        }
       }
     } catch (error) {
+      console.error('Pick image error:', error);
       Alert.alert('Error', 'Failed to pick image');
     }
   };
@@ -99,9 +132,13 @@ export default function ProfileEditDialog({ isOpen, onClose }: ProfileEditDialog
         email: string;
         phone?: string;
         avatar?: string;
+        isOnlineVisible?: boolean;
+        readReceipts?: boolean;
       } = {
         name: formData.name,
         email: formData.email,
+        isOnlineVisible: formData.isOnlineVisible,
+        readReceipts: formData.readReceipts,
       };
 
       if (formData.username.trim()) {
@@ -171,15 +208,13 @@ export default function ProfileEditDialog({ isOpen, onClose }: ProfileEditDialog
           >
             {/* Avatar Section */}
             <View style={styles.avatarSection}>
-              {previewUrl ? (
-                <Image source={{ uri: previewUrl }} style={styles.avatarImage} />
-              ) : (
-                <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary }]}>
-                  <Text style={styles.avatarText}>
-                    {getInitials(formData.name || 'U')}
-                  </Text>
-                </View>
-              )}
+              <Avatar
+                uri={previewUrl}
+                name={formData.name || 'U'}
+                size={100}
+                onPress={handleAvatarChange}
+                style={{ marginBottom: 12 }}
+              />
               <TouchableOpacity
                 style={[styles.uploadButton, { backgroundColor: colors.primary }]}
                 onPress={handleAvatarChange}
@@ -369,23 +404,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  avatarImage: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-  },
-  avatarPlaceholder: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    color: '#fff',
-    fontSize: 36,
-    fontWeight: 'bold',
-  },
   uploadButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -397,6 +415,31 @@ const styles = StyleSheet.create({
   uploadButtonText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  sectionHeader: {
+    marginTop: 24,
+    marginBottom: 16,
+    paddingBottom: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#ccc',
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  privacyItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  privacyLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  privacyHint: {
+    fontSize: 13,
   },
   field: {
     gap: 8,

@@ -17,6 +17,7 @@ import { useThemeColors } from '../utils/theme';
 import type { User } from '../types/auth.types';
 import { useRouter } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { Avatar } from './Avatar';
 
 interface NewChatModalProps {
   visible: boolean;
@@ -88,11 +89,12 @@ export default function NewChatModal({ visible, onClose }: NewChatModalProps) {
       disabled={loadingUserId !== null}
       activeOpacity={0.7}
     >
-      <View style={[styles.userAvatar, { backgroundColor: colors.primary }]}>
-        <Text style={[styles.userAvatarText, { color: colors.primaryForeground }]}>
-          {item.name.charAt(0).toUpperCase()}
-        </Text>
-      </View>
+      <Avatar
+        uri={item.avatar}
+        name={item.name}
+        size={50}
+        style={{ marginRight: 12 }}
+      />
       <View style={styles.userInfo}>
         <Text style={[styles.userName, { color: colors.foreground }]}>{item.name}</Text>
         {item.username && (

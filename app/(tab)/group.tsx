@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View, TextInput, Modal, TouchableWithoutFeedback } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import "../../global.css";
 import GroupCreateModal from '../../src/components/GroupCreateModal';
@@ -8,11 +8,16 @@ import { chatApi } from '../../src/services/api/chat';
 import { useAuthStore } from '../../src/store/authStore';
 import { useChatStore } from '../../src/store/chatStore';
 import { useThemeColors } from '../../src/utils/theme';
+import { Avatar } from '../../src/components/Avatar';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function GroupListScreen() {
   const insets = useSafeAreaInsets();
   const { chats, fetchChats, isChatsLoading } = useChatStore();
+  const { user } = useAuthStore();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [contextMenu, setContextMenu] = useState<{ visible: boolean; item: any | null }>({ visible: false, item: null });
   const router = useRouter();
   const colors = useThemeColors();
 
@@ -139,6 +144,50 @@ export default function GroupListScreen() {
       textAlign: 'center',
       fontWeight: '500',
     },
+    searchBar: {
+      paddingHorizontal: 16,
+      paddingTop: 10,
+      paddingBottom: 8,
+      backgroundColor: colors.background,
+      borderBottomWidth: 0.5,
+      borderBottomColor: colors.border,
+    },
+    searchInput: {
+      borderWidth: 1.2,
+      borderColor: colors.border,
+      borderRadius: 22,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      color: colors.foreground,
+      backgroundColor: colors.muted,
+      fontSize: 15,
+      fontWeight: '500',
+    },
+    menuOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'flex-end',
+    },
+    menuContent: {
+      backgroundColor: colors.card,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      padding: 16,
+      paddingBottom: 32,
+    },
+    menuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 16,
+    },
+    menuItemText: {
+      fontSize: 16,
+      marginLeft: 12,
+      color: colors.foreground,
+    },
+    menuItemDestructive: {
+      color: '#ef4444',
+    },
   });
 
   useEffect(() => {
@@ -146,29 +195,69 @@ export default function GroupListScreen() {
   }, []);
 
   const groupChats = chats.filter((c) => c.isGroup || c.type === 'GROUP');
+  const filteredGroups = groupChats.filter((g) => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return true;
+    const name = (g.groupName || '').toLowerCase();
+    const last = (g.lastMessage?.content || '').toLowerCase();
+    const participants = (g.participants || []).map((p: any) => (p.username || p.name || '').toLowerCase()).join(' ');
+    return name.includes(q) || last.includes(q) || participants.includes(q);
+  });
 
   const renderItem = ({ item }: any) => (
     <TouchableOpacity style={styles.item} onPress={() => router.push(`/chat/${item._id}`)} activeOpacity={0.7}>
-      <View style={styles.avatar}>
-        <Text style={styles.avatarText}>
-          {(item.groupName || 'G').charAt(0).toUpperCase()}
-        </Text>
-      </View>
+      <Avatar
+        uri={item.icon}
+        name={item.groupName || 'Group'}
+        size={56}
+        style={{ marginRight: 14 }}
+      />
       <View style={styles.info}>
         <Text style={styles.title} numberOfLines={1}>{item.groupName || 'Unnamed Group'}</Text>
         <Text style={styles.subtitle} numberOfLines={1}>{item.lastMessage?.content || 'No messages yet'}</Text>
       </View>
       <TouchableOpacity style={styles.menuBtn} onPress={() => onGroupMenu(item)}>
-        <Text style={styles.menuText}>⋮</Text>
+        <Ionicons name="ellipsis-vertical" size={20} color={colors.mutedForeground} />
       </TouchableOpacity>
     </TouchableOpacity>
   );
 
   const onGroupMenu = (group: any) => {
-    Alert.alert(group.groupName || 'Group', undefined, [
-      { text: 'Leave Group', onPress: async () => { try { await chatApi.removeMember(group._id, useAuthStore.getState().user?._id || ''); fetchChats(); } catch (e) { console.error(e); } } },
-      { text: 'Delete Group', style: 'destructive', onPress: async () => { try { await chatApi.deleteChat(group._id); fetchChats(); } catch (e) { console.error(e); } } },
+    setContextMenu({ visible: true, item: group });
+  };
+
+  const handleAction = async (action: 'delete' | 'leave') => {
+    const { item } = contextMenu;
+    if (!item) return;
+
+    setContextMenu({ visible: false, item: null });
+
+    try {
+      if (action === 'delete') {
+         await chatApi.deleteChat(item._id);
+         fetchChats(); 
+      } else if (action === 'leave') {
+         await chatApi.removeMember(item._id, useAuthStore.getState().user?._id || '');
+         fetchChats();
+      }
+    } catch (error) {
+      console.error('Action failed', error);
+      Alert.alert('Error', 'Failed to perform action');
+    }
+  };
+
+  const confirmAction = (action: 'delete' | 'leave') => {
+    const { item } = contextMenu;
+    if (!item) return;
+    
+    const title = action === 'delete' ? 'Delete Group' : 'Leave Group';
+    const message = action === 'delete' 
+      ? 'Permanently delete this group?' 
+      : `Are you sure you want to leave ${item.groupName}?`;
+
+    Alert.alert(title, message, [
       { text: 'Cancel', style: 'cancel' },
+      { text: action === 'delete' ? 'Delete' : 'Leave', style: 'destructive', onPress: () => handleAction(action) }
     ]);
   };
 
@@ -189,21 +278,84 @@ export default function GroupListScreen() {
           <Text style={styles.newButtonText}>+ New</Text>
         </TouchableOpacity>
       </View>
+      <View style={styles.searchBar}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search groups by name or member..."
+          placeholderTextColor={colors.mutedForeground}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          returnKeyType="search"
+        />
+      </View>
 
       <FlatList
-        data={groupChats}
+        data={filteredGroups}
         keyExtractor={(item) => item._id}
         renderItem={renderItem}
         contentContainerStyle={{ paddingVertical: 12 }}
         ListEmptyComponent={
           <View style={styles.center}>
-            <Text style={styles.emptyText}>No groups yet</Text>
-            <Text style={styles.emptySubtext}>Create or join a group to get started</Text>
+            <Text style={{ fontSize: 48, marginBottom: 16 }}>
+              {searchQuery ? '🔍' : '👥'}
+            </Text>
+            <Text style={styles.emptyText}>
+              {searchQuery ? 'No groups found' : 'No groups yet'}
+            </Text>
+            <Text style={styles.emptySubtext}>
+              {searchQuery 
+                ? `No results matching "${searchQuery}"`
+                : 'Create or join a group to get started'}
+            </Text>
           </View>
         }
       />
 
       <GroupCreateModal visible={isCreateOpen} onClose={() => setIsCreateOpen(false)} />
+
+      <Modal
+        visible={contextMenu.visible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setContextMenu({ visible: false, item: null })}
+      >
+        <TouchableWithoutFeedback onPress={() => setContextMenu({ visible: false, item: null })}>
+          <View style={styles.menuOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={styles.menuContent}>
+                {contextMenu.item && (() => {
+                   const chat = contextMenu.item;
+                   const isOwner = chat.createdBy === user?._id || (typeof chat.createdBy === 'object' && (chat.createdBy as any)._id === user?._id);
+                   
+                   return (
+                     <>
+                        {!isOwner && (
+                          <TouchableOpacity 
+                            style={styles.menuItem} 
+                            onPress={() => confirmAction('leave')}
+                          >
+                            <Ionicons name="log-out-outline" size={24} color={colors.foreground} />
+                            <Text style={styles.menuItemText}>Leave Group</Text>
+                          </TouchableOpacity>
+                        )}
+
+                        {isOwner && (
+                          <TouchableOpacity 
+                            style={styles.menuItem} 
+                            onPress={() => confirmAction('delete')}
+                          >
+                            <Ionicons name="trash-outline" size={24} color="#ef4444" />
+                            <Text style={[styles.menuItemText, styles.menuItemDestructive]}>Delete Group</Text>
+                          </TouchableOpacity>
+                        )}
+                     </>
+                   );
+                })()}
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </View>
   );
 }

@@ -1,10 +1,12 @@
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { userApi } from '../services/api/user';
 import { useChatStore } from '../store/chatStore';
 import type { User } from '../types/auth.types';
+import { SmartImage } from './SmartImage';
+import { Avatar } from './Avatar';
 
 interface Props {
   visible: boolean;
@@ -73,12 +75,20 @@ export default function GroupCreateModal({ visible, onClose, onCreated }: Props)
   const pickImage = async () => {
     try {
       const res = await ImagePicker.launchImageLibraryAsync({ base64: true, quality: 0.7, allowsEditing: true });
-      if (!res.cancelled) {
+      if (!res.canceled && res.assets && res.assets.length > 0) {
+        const asset = res.assets[0];
+        
+        // Check file size (limit to 5MB)
+        if (asset.fileSize && asset.fileSize > 5 * 1024 * 1024) {
+          Alert.alert('Error', 'Image too large. Maximum size is 5MB.');
+          return;
+        }
+
         // Keep uri for preview; prefer base64 when available
-        if ((res as any).base64) {
-          setIconUri(`data:image/jpeg;base64,${(res as any).base64}`);
+        if (asset.base64) {
+          setIconUri(`data:image/jpeg;base64,${asset.base64}`);
         } else {
-          setIconUri((res as any).uri || (res as any).uri);
+          setIconUri(asset.uri || asset.uri);
         }
       }
     } catch (err) {
@@ -96,7 +106,7 @@ export default function GroupCreateModal({ visible, onClose, onCreated }: Props)
         participants: participantIds, 
         isGroup: true, 
         groupName: groupName.trim(),
-        groupDescription: groupDescription.trim() || undefined,
+        description: groupDescription.trim() || undefined,
         groupUsername: groupUsername.trim() || undefined,
         groupRules: groupRules.trim() || undefined,
         groupCategory: groupCategory || 'other',
@@ -121,7 +131,12 @@ export default function GroupCreateModal({ visible, onClose, onCreated }: Props)
 
   const renderUser = ({ item }: { item: User }) => (
     <TouchableOpacity style={styles.userItem} onPress={() => toggleSelect(item)}>
-      <View style={styles.userAvatar}><Text style={styles.userAvatarText}>{item.name.charAt(0).toUpperCase()}</Text></View>
+      <Avatar
+        uri={item.avatar}
+        name={item.name}
+        size={40}
+        style={{ marginRight: 14 }}
+      />
       <View style={{ flex: 1 }}>
         <Text style={styles.userName}>{item.name}</Text>
         {item.username && <Text style={styles.userSub}>@{item.username}</Text>}
@@ -206,7 +221,15 @@ export default function GroupCreateModal({ visible, onClose, onCreated }: Props)
             <Text style={{ fontSize: 13, color: '#666', marginBottom: 10, fontWeight: '600' }}>Appearance & Privacy</Text>
             <View style={styles.iconRow}>
               <TouchableOpacity style={styles.iconPicker} onPress={pickImage}>
-                {iconUri ? <Image source={{ uri: iconUri }} style={styles.iconPreview} /> : <Text style={styles.iconPickerText}>+ Icon</Text>}
+                {iconUri ? (
+                  <SmartImage 
+                    source={iconUri} 
+                    style={styles.iconPreview} 
+                    contentFit="cover"
+                  />
+                ) : (
+                  <Text style={styles.iconPickerText}>+ Icon</Text>
+                )}
               </TouchableOpacity>
               <View style={{ flex: 1 }}>
                 <TouchableOpacity onPress={() => setIsPublic(!isPublic)} style={styles.toggleButton}>

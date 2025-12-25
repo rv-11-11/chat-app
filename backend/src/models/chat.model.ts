@@ -28,6 +28,7 @@ export interface ChatDocument extends Document {
   createdAt: Date;
   updatedAt: Date;
   allowInviteLinkJoin: boolean;
+  strictMode?: boolean;
 }
 
 const chatSchema = new Schema<ChatDocument>(
@@ -109,6 +110,10 @@ const chatSchema = new Schema<ChatDocument>(
     allowInviteLinkJoin: {
       type: Boolean,
       default: true,
+    },
+    strictMode: {
+      type: Boolean,
+      default: false,
     },
     subscriberCount: {
       type: Number,
