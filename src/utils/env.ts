@@ -12,3 +12,4 @@ export const ENV = {
   CLOUDINARY_API_KEY: getEnvVar('CLOUDINARY_API_KEY', ''),
   NODE_ENV: getEnvVar('NODE_ENV', 'development'),
 } as const;
+
