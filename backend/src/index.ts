@@ -33,24 +33,17 @@ app.use(express.urlencoded({ extended: true, limit: "200mb" }));
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, Postman, etc.)
+      // Allow mobile apps, Postman, server-to-server
       if (!origin) return callback(null, true);
-      
-      // In development, allow any localhost origin (for Expo, Vite, etc.)
-      if (Env.NODE_ENV === 'development' && origin.includes('localhost')) {
+
+      // Allow configured frontend origin if present
+      const allowedOrigins = [Env.FRONTEND_ORIGIN];
+
+      if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
-      
-      // List of allowed origins for production
-      const allowedOrigins = [
-        Env.FRONTEND_ORIGIN, // Vite dev server / production frontend
-      ];
-      
-      if (allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
+
+      return callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
   })
@@ -165,10 +158,9 @@ app.get(
   })
 );
 
-if (Env.NODE_ENV === "production") {
+if (false && Env.NODE_ENV === "production") {
   const clientPath = path.resolve(__dirname, "../../client/dist");
 
-  //Serve static files
   app.use(express.static(clientPath));
 
   app.get(/^(?!\/api).*/, (req: Request, res: Response) => {
@@ -179,7 +171,9 @@ if (Env.NODE_ENV === "production") {
 app.use(errorHandler);
 
 
-server.listen(Env.PORT, async () => {
+const PORT = Number(process.env.PORT) || Env.PORT || 3000;
+
+server.listen(PORT, async () => {
   await connectDatabase();
-  console.log(`Server running on port ${Env.PORT} in ${Env.NODE_ENV} mode`);
+  console.log(`🚀 Server running on port ${PORT} in ${Env.NODE_ENV} mode`);
 });
