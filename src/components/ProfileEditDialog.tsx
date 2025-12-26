@@ -77,7 +77,7 @@ export default function ProfileEditDialog({ isOpen, onClose }: ProfileEditDialog
         if (!base64 && asset.uri) {
           try {
             base64 = await FileSystem.readAsStringAsync(asset.uri, { 
-              encoding: FileSystem.EncodingType.Base64 
+              encoding: 'base64' 
             });
           } catch (readError) {
             console.error('Failed to read image:', readError);
@@ -511,6 +511,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-
 
 
