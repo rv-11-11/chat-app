@@ -1,17 +1,20 @@
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { userApi } from '../services/api/user';
 import { useChatStore } from '../store/chatStore';
 import type { User } from '../types/auth.types';
+import { SmartImage } from './SmartImage';
+import { Avatar } from './Avatar';
 
 interface Props {
   visible: boolean;
   onClose: () => void;
+  onCreated?: (chat: any) => void;
 }
 
-export default function GroupCreateModal({ visible, onClose }: Props) {
+export default function GroupCreateModal({ visible, onClose, onCreated }: Props) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<User[]>([]);
   const [selected, setSelected] = useState<User[]>([]);
@@ -72,12 +75,20 @@ export default function GroupCreateModal({ visible, onClose }: Props) {
   const pickImage = async () => {
     try {
       const res = await ImagePicker.launchImageLibraryAsync({ base64: true, quality: 0.7, allowsEditing: true });
-      if (!res.cancelled) {
+      if (!res.canceled && res.assets && res.assets.length > 0) {
+        const asset = res.assets[0];
+        
+        // Check file size (limit to 5MB)
+        if (asset.fileSize && asset.fileSize > 5 * 1024 * 1024) {
+          Alert.alert('Error', 'Image too large. Maximum size is 5MB.');
+          return;
+        }
+
         // Keep uri for preview; prefer base64 when available
-        if ((res as any).base64) {
-          setIconUri(`data:image/jpeg;base64,${(res as any).base64}`);
+        if (asset.base64) {
+          setIconUri(`data:image/jpeg;base64,${asset.base64}`);
         } else {
-          setIconUri((res as any).uri || (res as any).uri);
+          setIconUri(asset.uri || asset.uri);
         }
       }
     } catch (err) {
@@ -95,7 +106,7 @@ export default function GroupCreateModal({ visible, onClose }: Props) {
         participants: participantIds, 
         isGroup: true, 
         groupName: groupName.trim(),
-        groupDescription: groupDescription.trim() || undefined,
+        description: groupDescription.trim() || undefined,
         groupUsername: groupUsername.trim() || undefined,
         groupRules: groupRules.trim() || undefined,
         groupCategory: groupCategory || 'other',
@@ -103,6 +114,9 @@ export default function GroupCreateModal({ visible, onClose }: Props) {
         isPublic 
       });
       if (chat) {
+        if (onCreated) {
+          onCreated(chat);
+        }
         onClose();
       } else {
         Alert.alert('Error', 'Failed to create group');
@@ -117,7 +131,12 @@ export default function GroupCreateModal({ visible, onClose }: Props) {
 
   const renderUser = ({ item }: { item: User }) => (
     <TouchableOpacity style={styles.userItem} onPress={() => toggleSelect(item)}>
-      <View style={styles.userAvatar}><Text style={styles.userAvatarText}>{item.name.charAt(0).toUpperCase()}</Text></View>
+      <Avatar
+        uri={item.avatar}
+        name={item.name}
+        size={40}
+        style={{ marginRight: 14 }}
+      />
       <View style={{ flex: 1 }}>
         <Text style={styles.userName}>{item.name}</Text>
         {item.username && <Text style={styles.userSub}>@{item.username}</Text>}
@@ -141,20 +160,41 @@ export default function GroupCreateModal({ visible, onClose }: Props) {
             <TouchableOpacity onPress={onClose}><Text style={styles.close}>✕</Text></TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.form} keyboardShouldPersistTaps="handled">
-            <TextInput style={styles.input} placeholder="Group name" value={groupName} onChangeText={setGroupName} />
+          <ScrollView style={styles.form} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <Text style={{ fontSize: 13, color: '#666', marginBottom: 8, fontWeight: '600' }}>Basic Information</Text>
+            <TextInput 
+              style={styles.input} 
+              placeholder="Group name *" 
+              placeholderTextColor="#999"
+              value={groupName} 
+              onChangeText={setGroupName} 
+            />
 
-            <TextInput style={styles.input} placeholder="Description" value={groupDescription} onChangeText={setGroupDescription} maxLength={500} />
+            <TextInput 
+              style={styles.input} 
+              placeholder="Description (optional)" 
+              placeholderTextColor="#999"
+              value={groupDescription} 
+              onChangeText={setGroupDescription} 
+              maxLength={500} 
+            />
 
-            <TextInput style={styles.input} placeholder="Group username (@groupname)" value={groupUsername} onChangeText={(text) => setGroupUsername(text.toLowerCase())} maxLength={30} />
+            <TextInput 
+              style={styles.input} 
+              placeholder="Group username (@groupname)" 
+              placeholderTextColor="#999"
+              value={groupUsername} 
+              onChangeText={(text) => setGroupUsername(text.toLowerCase())} 
+              maxLength={30} 
+            />
 
-            <View style={{ marginTop: 8 }}>
-              <Text style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Category</Text>
-              <View style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 8, overflow: 'hidden' }}>
+            <View style={{ marginBottom: 16 }}>
+              <Text style={{ fontSize: 13, color: '#666', marginBottom: 8, fontWeight: '600' }}>Category</Text>
+              <View style={{ borderWidth: 1, borderColor: '#e8e8e8', borderRadius: 10, overflow: 'hidden', backgroundColor: '#f8f9fa' }}>
                 <Picker
                   selectedValue={groupCategory}
                   onValueChange={(value) => setGroupCategory(value)}
-                  style={{ height: 40 }}
+                  style={{ height: 50 }}
                 >
                   <Picker.Item label="Other" value="other" />
                   <Picker.Item label="Study" value="study" />
@@ -168,8 +208,9 @@ export default function GroupCreateModal({ visible, onClose }: Props) {
             </View>
 
             <TextInput 
-              style={[styles.input, { minHeight: 80, textAlignVertical: 'top' }]} 
-              placeholder="Group rules" 
+              style={[styles.input, { minHeight: 100, textAlignVertical: 'top', paddingTop: 14 }]} 
+              placeholder="Group rules (optional)" 
+              placeholderTextColor="#999"
               value={groupRules} 
               onChangeText={setGroupRules} 
               maxLength={1000}
@@ -177,33 +218,64 @@ export default function GroupCreateModal({ visible, onClose }: Props) {
               numberOfLines={4}
             />
 
+            <Text style={{ fontSize: 13, color: '#666', marginBottom: 10, fontWeight: '600' }}>Appearance & Privacy</Text>
             <View style={styles.iconRow}>
               <TouchableOpacity style={styles.iconPicker} onPress={pickImage}>
-                {iconUri ? <Image source={{ uri: iconUri }} style={styles.iconPreview} /> : <Text style={styles.iconPickerText}>Pick Icon</Text>}
+                {iconUri ? (
+                  <SmartImage 
+                    source={iconUri} 
+                    style={styles.iconPreview} 
+                    contentFit="cover"
+                  />
+                ) : (
+                  <Text style={styles.iconPickerText}>+ Icon</Text>
+                )}
               </TouchableOpacity>
-              <View style={{ marginLeft: 12 }}>
+              <View style={{ flex: 1 }}>
                 <TouchableOpacity onPress={() => setIsPublic(!isPublic)} style={styles.toggleButton}>
-                  <Text style={{ color: '#fff' }}>{isPublic ? 'Public' : 'Private'}</Text>
+                  <Text style={{ color: '#fff', fontWeight: '600', fontSize: 15 }}>{isPublic ? '🌐 Public' : '🔒 Private'}</Text>
                 </TouchableOpacity>
               </View>
             </View>
 
-            <View style={{ marginTop: 12 }}>
-              <TextInput style={styles.input} placeholder="Search users to add (type 2+ chars)" value={query} onChangeText={setQuery} />
-            </View>
+            <Text style={{ fontSize: 13, color: '#666', marginBottom: 10, marginTop: 8, fontWeight: '600' }}>Add Members *</Text>
+            <TextInput 
+              style={styles.input} 
+              placeholder="Search users (type 2+ characters)" 
+              placeholderTextColor="#999"
+              value={query} 
+              onChangeText={setQuery} 
+            />
 
-            <View style={styles.selectedRow}>
-              {selected.map(u => (
-                <View key={u._id} style={styles.selectedChip}><Text style={{ color: '#fff' }}>{u.name}</Text></View>
-              ))}
-            </View>
+            {selected.length > 0 && (
+              <>
+                <Text style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>Selected ({selected.length})</Text>
+                <View style={styles.selectedRow}>
+                  {selected.map(u => (
+                    <View key={u._id} style={styles.selectedChip}>
+                      <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>{u.name}</Text>
+                    </View>
+                  ))}
+                </View>
+              </>
+            )}
 
-            <View style={{ minHeight: 200, marginTop: 12 }}>
+            <View style={{ minHeight: 180, marginTop: 8, borderRadius: 12, overflow: 'hidden' }}>
               {isSearching ? (
-                <ActivityIndicator style={{ marginTop: 20 }} />
-              ) : (
-                results.map(renderUserWrapper)
-              )}
+                <View style={{ padding: 40, alignItems: 'center' }}>
+                  <ActivityIndicator size="large" color="#007AFF" />
+                  <Text style={{ marginTop: 12, color: '#666' }}>Searching...</Text>
+                </View>
+              ) : results.length > 0 ? (
+                <>
+                  <Text style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>Results ({results.length})</Text>
+                  {results.map(renderUserWrapper)}
+                </>
+              ) : query.trim().length >= 2 ? (
+                <View style={{ padding: 30, alignItems: 'center' }}>
+                  <Text style={{ color: '#999', fontSize: 14 }}>No users found</Text>
+                </View>
+              ) : null}
             </View>
 
             <TouchableOpacity style={styles.createBtn} onPress={handleCreate} disabled={isCreating}>
@@ -217,25 +289,155 @@ export default function GroupCreateModal({ visible, onClose }: Props) {
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  content: { backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '85%' },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  header: { fontSize: 18, fontWeight: '700' },
-  close: { fontSize: 20, color: '#666' },
-  form: { padding: 16 },
-  input: { backgroundColor: '#f5f5f5', padding: 12, borderRadius: 8, marginBottom: 8 },
-  iconRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
-  iconPicker: { width: 64, height: 64, borderRadius: 8, backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' },
-  iconPickerText: { color: '#666' },
-  iconPreview: { width: 64, height: 64, borderRadius: 8 },
-  toggleButton: { backgroundColor: '#007AFF', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8 },
-  userItem: { flexDirection: 'row', alignItems: 'center', padding: 10, borderBottomWidth: 1, borderBottomColor: '#f7f7f7' },
-  userAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#007AFF', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  userAvatarText: { color: '#fff', fontWeight: '700' },
-  userName: { fontWeight: '600' },
-  userSub: { color: '#666', marginTop: 2 },
-  selectedRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 8, gap: 8 },
-  selectedChip: { backgroundColor: '#007AFF', paddingHorizontal: 8, paddingVertical: 6, borderRadius: 16, marginRight: 8, marginBottom: 8 },
-  createBtn: { backgroundColor: '#007AFF', padding: 14, borderRadius: 10, alignItems: 'center', marginTop: 12 },
-  createText: { color: '#fff', fontWeight: '700' },
+  overlay: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.6)', 
+    justifyContent: 'flex-end' 
+  },
+  content: { 
+    backgroundColor: '#fff', 
+    borderTopLeftRadius: 20, 
+    borderTopRightRadius: 20, 
+    maxHeight: '92%',
+    paddingBottom: 20
+  },
+  headerRow: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center',
+    padding: 20, 
+    paddingBottom: 16,
+    borderBottomWidth: 1, 
+    borderBottomColor: '#e8e8e8' 
+  },
+  header: { 
+    fontSize: 20, 
+    fontWeight: '700',
+    color: '#1a1a1a'
+  },
+  close: { 
+    fontSize: 24, 
+    color: '#666',
+    fontWeight: '300'
+  },
+  form: { 
+    padding: 20,
+    paddingTop: 16
+  },
+  input: { 
+    backgroundColor: '#f8f9fa', 
+    padding: 14, 
+    paddingHorizontal: 16,
+    borderRadius: 10, 
+    marginBottom: 16,
+    fontSize: 15,
+    borderWidth: 1,
+    borderColor: '#e8e8e8'
+  },
+  iconRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    marginTop: 4,
+    marginBottom: 16,
+    gap: 16
+  },
+  iconPicker: { 
+    width: 80, 
+    height: 80, 
+    borderRadius: 12, 
+    backgroundColor: '#f0f0f0', 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#e0e0e0',
+    borderStyle: 'dashed'
+  },
+  iconPickerText: { 
+    color: '#666',
+    fontSize: 13,
+    fontWeight: '600'
+  },
+  iconPreview: { 
+    width: 80, 
+    height: 80, 
+    borderRadius: 12 
+  },
+  toggleButton: { 
+    backgroundColor: '#007AFF', 
+    paddingHorizontal: 20, 
+    paddingVertical: 12, 
+    borderRadius: 10,
+    minWidth: 100,
+    alignItems: 'center'
+  },
+  userItem: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    padding: 14, 
+    paddingVertical: 12,
+    borderBottomWidth: 1, 
+    borderBottomColor: '#f0f0f0',
+    backgroundColor: '#fafafa',
+    marginBottom: 1
+  },
+  userAvatar: { 
+    width: 48, 
+    height: 48, 
+    borderRadius: 24, 
+    backgroundColor: '#007AFF', 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    marginRight: 14 
+  },
+  userAvatarText: { 
+    color: '#fff', 
+    fontWeight: '700',
+    fontSize: 18
+  },
+  userName: { 
+    fontWeight: '600',
+    fontSize: 15,
+    color: '#1a1a1a'
+  },
+  userSub: { 
+    color: '#666', 
+    marginTop: 3,
+    fontSize: 13
+  },
+  selectedRow: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    marginTop: 4,
+    marginBottom: 16,
+    gap: 10
+  },
+  selectedChip: { 
+    backgroundColor: '#007AFF', 
+    paddingHorizontal: 14, 
+    paddingVertical: 8, 
+    borderRadius: 20,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3
+  },
+  createBtn: { 
+    backgroundColor: '#007AFF', 
+    padding: 16, 
+    borderRadius: 12, 
+    alignItems: 'center', 
+    marginTop: 24,
+    marginBottom: 8,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 5
+  },
+  createText: { 
+    color: '#fff', 
+    fontWeight: '700',
+    fontSize: 16
+  },
 });

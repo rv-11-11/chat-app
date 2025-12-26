@@ -5,6 +5,8 @@ export interface User {
   email: string;
   phone?: string;
   avatar?: string | null;
+  isOnlineVisible?: boolean;
+  readReceipts?: boolean;
   role?: 'USER' | 'MODERATOR' | 'ADMIN';
   isSuspended?: boolean;
   suspendedUntil?: Date;

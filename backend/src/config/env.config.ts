@@ -10,7 +10,7 @@ export const Env = {
   ),
 
   JWT_SECRET: getEnv("JWT_SECRET", "secret_jwt"),
-  JWT_EXPIRES_IN: getEnv("JWT_EXPIRES_IN", "15m"),
+  JWT_EXPIRES_IN: getEnv("JWT_EXPIRES_IN", "3315m"),
 
   SESSION_SECRET: getEnv(
     "SESSION_SECRET",

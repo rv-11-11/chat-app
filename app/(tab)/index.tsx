@@ -8,30 +8,24 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
-  Image,
+  Alert,
+  Modal,
+  TouchableWithoutFeedback,
+  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import '../../global.css';
 import { useThemeColors } from '../../src/utils/theme';
+import { Avatar } from '../../src/components/Avatar';
 import { useChatStore } from '../../src/store/chatStore';
 import { useAuthStore } from '../../src/store/authStore';
 import { formatChatTime, getOtherUserAndGroup } from '../../src/utils/helpers';
 import { channelApi } from '../../src/services/api/channel';
+import { chatApi } from '../../src/services/api/chat';
+import { communityApi } from '../../src/services/api/community';
 import apiClient from '../../src/services/api/client';
-
-// Icons (using Unicode symbols for simplicity - you can replace with react-native-vector-icons if available)
-const SearchIcon = () => <Text style={{ fontSize: 16, opacity: 0.5 }}>🔍</Text>;
-const UserIcon = () => <Text style={{ fontSize: 20 }}>👤</Text>;
-const GroupIcon = () => <Text style={{ fontSize: 20 }}>👥</Text>;
-const ChannelIcon = () => <Text style={{ fontSize: 20 }}>📢</Text>;
-const CommunityIcon = () => <Text style={{ fontSize: 20 }}>🏘️</Text>;
-const StarIcon = () => <Text style={{ fontSize: 14 }}>⭐</Text>;
-const CheckIcon = () => <Text style={{ fontSize: 12 }}>✓</Text>;
-const BellIcon = ({ active }: { active?: boolean }) => (
-  <Text style={{ fontSize: 16, opacity: active ? 1 : 0.5 }}>{active ? '🔔' : '🔕'}</Text>
-);
-const VerifiedIcon = () => <Text style={{ fontSize: 14 }}>✓</Text>;
+import { Ionicons } from '@expo/vector-icons';
 
 interface ChannelType {
   _id: string;
@@ -46,6 +40,40 @@ interface ChannelType {
   participants?: any[];
 }
 
+const SearchIcon = () => {
+  const colors = useThemeColors();
+  return <Ionicons name="search-outline" size={20} color={colors.mutedForeground} />;
+};
+
+const UserIcon = () => {
+  const colors = useThemeColors();
+  return <Ionicons name="person" size={24} color={colors.mutedForeground} />;
+};
+
+const GroupIcon = () => {
+  const colors = useThemeColors();
+  return <Ionicons name="people" size={24} color={colors.mutedForeground} />;
+};
+
+const ChannelIcon = () => {
+  const colors = useThemeColors();
+  return <Ionicons name="megaphone-outline" size={24} color={colors.mutedForeground} />;
+};
+
+const CommunityIcon = () => {
+  const colors = useThemeColors();
+  return <Ionicons name="people-circle-outline" size={24} color={colors.mutedForeground} />;
+};
+
+const StarIcon = () => {
+  return <Ionicons name="star" size={16} color="#eab308" />;
+};
+
+const VerifiedIcon = () => {
+  const colors = useThemeColors();
+  return <Ionicons name="checkmark-circle" size={16} color={colors.primary} />;
+};
+
 const Home = () => {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -53,24 +81,31 @@ const Home = () => {
   const { chats, fetchChats, isChatsLoading } = useChatStore();
   
   const [channels, setChannels] = useState<ChannelType[]>([]);
-  const [discoverChannels, setDiscoverChannels] = useState<ChannelType[]>([]);
-  const [sponsoredChannels, setSponsoredChannels] = useState<ChannelType[]>([]);
+  const [communities, setCommunities] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showDiscover, setShowDiscover] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingChannels, setLoadingChannels] = useState(false);
-  const [loadingDiscover, setLoadingDiscover] = useState(false);
-  const [loadingSponsored, setLoadingSponsored] = useState(false);
+  const [loadingCommunities, setLoadingCommunities] = useState(false);
   const [subscribingChannels, setSubscribingChannels] = useState<Set<string>>(new Set());
-  const [globalSearchResults, setGlobalSearchResults] = useState<{
-    users: any[];
-    channels: any[];
-    communities: any[];
-    groups: any[];
-  }>({ users: [], channels: [], communities: [], groups: [] });
-  const [isSearching, setIsSearching] = useState(false);
+  const [filterType, setFilterType] = useState<'all' | 'groups' | 'channels' | 'communities'>('all');
+  const [contextMenu, setContextMenu] = useState<{ visible: boolean; item: any | null }>({ visible: false, item: null });
 
+  // Read route params to prefill search
+  const params = useLocalSearchParams<{ search?: string | string[]; q?: string | string[] }>();
+  useEffect(() => {
+    const searchParam = Array.isArray(params.search) ? params.search[0] : params.search;
+    const qParam = Array.isArray(params.q) ? params.q[0] : params.q;
+
+    if (typeof qParam === 'string' && qParam.length > 0) {
+      setSearchQuery(qParam);
+    }
+  }, [params.search, params.q]);
   const currentUserId = user?._id || null;
+
+  const isUserSubscribed = useCallback((channel: ChannelType) => {
+    if (!user) return false;
+    return channel.participants?.some(p => (typeof p === 'string' ? p === user._id : p._id === user._id)) ?? false;
+  }, [user]);
 
   // Fetch data on mount
   useEffect(() => {
@@ -82,7 +117,7 @@ const Home = () => {
       await Promise.all([
         fetchChats(),
         fetchUserChannels(),
-        fetchSponsoredChannels(),
+        fetchUserCommunities(),
       ]);
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -101,48 +136,15 @@ const Home = () => {
     }
   };
 
-  const fetchDiscoverChannels = async () => {
-    if (discoverChannels.length > 0) return;
-    
-    setLoadingDiscover(true);
+  const fetchUserCommunities = async () => {
+    setLoadingCommunities(true);
     try {
-      const response = await apiClient.get('/channel/recommended?limit=50');
-      const publicChannels = (response.data.channels || []).filter(
-        (channel: any) => channel.isPublic !== false
-      );
-      setDiscoverChannels(publicChannels);
-    } catch (error: any) {
-      console.log('Discover channels not available:', error?.response?.status);
-      setDiscoverChannels([]);
+      const response = await communityApi.getMyCommunities();
+      setCommunities(response.communities || []);
+    } catch (error) {
+      console.error('Failed to fetch communities:', error);
     } finally {
-      setLoadingDiscover(false);
-    }
-  };
-
-  const fetchSponsoredChannels = async () => {
-    setLoadingSponsored(true);
-    try {
-      // Try to fetch featured channels first
-      const response = await apiClient.get('/admin/channels/featured');
-      const channels = (response.data.channels || []).slice(0, 2);
-      setSponsoredChannels(channels);
-    } catch (error: any) {
-      // If featured endpoint doesn't exist (404) or fails, try recommended channels
-      if (error?.response?.status === 404 || true) {
-        try {
-          const response = await apiClient.get('/channel/recommended?limit=2');
-          const publicChannels = (response.data.channels || []).filter(
-            (channel: any) => channel.isPublic !== false
-          );
-          setSponsoredChannels(publicChannels);
-        } catch (fallbackError: any) {
-          // If recommended also fails, silently fail - sponsored section will be hidden
-          console.log('Sponsored channels not available');
-          setSponsoredChannels([]);
-        }
-      }
-    } finally {
-      setLoadingSponsored(false);
+      setLoadingCommunities(false);
     }
   };
 
@@ -152,229 +154,77 @@ const Home = () => {
     setRefreshing(false);
   }, []);
 
-  // Debounced search effect
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchQuery.trim()) {
-        performGlobalSearch(searchQuery.trim());
-      } else {
-        setGlobalSearchResults({ users: [], channels: [], communities: [], groups: [] });
-        setIsSearching(false);
-      }
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
-  // Fetch discover channels when tab is switched
-  useEffect(() => {
-    if (showDiscover && discoverChannels.length === 0) {
-      fetchDiscoverChannels();
-    }
-  }, [showDiscover]);
-
-  const performGlobalSearch = async (query: string) => {
-    if (!showDiscover) return;
-    
-    setIsSearching(true);
-    try {
-      const response = await apiClient.get(`/search?q=${encodeURIComponent(query)}&limit=20`);
-      const { users = [], channels = [], communities = [], groups = [] } = response.data;
-      setGlobalSearchResults({ users, channels, communities, groups });
-    } catch (error: any) {
-      console.log('Global search not available:', error?.response?.status);
-      setGlobalSearchResults({ users: [], channels: [], communities: [], groups: [] });
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const handleSubscribeToChannel = async (channelId: string) => {
-    setSubscribingChannels((prev) => new Set(prev).add(channelId));
-    try {
-      await apiClient.post(`/channel/${channelId}/subscribe`);
-      
-      // Update discover channels list
-      setDiscoverChannels((prev) =>
-        prev.map((ch) => {
-          if (ch._id === channelId) {
-            return {
-              ...ch,
-              participants: [...(ch.participants || []), user as any],
-              subscriberCount: (ch.subscriberCount || 0) + 1,
-            };
-          }
-          return ch;
-        })
-      );
-      
-      await fetchUserChannels();
-    } catch (error: any) {
-      console.error('Failed to subscribe:', error);
-    } finally {
-      setSubscribingChannels((prev) => {
-        const next = new Set(prev);
-        next.delete(channelId);
-        return next;
-      });
-    }
-  };
-
-  const handleUnsubscribeFromChannel = async (channelId: string) => {
-    setSubscribingChannels((prev) => new Set(prev).add(channelId));
-    try {
-      await apiClient.post(`/channel/${channelId}/unsubscribe`);
-      
-      setDiscoverChannels((prev) =>
-        prev.map((ch) => {
-          if (ch._id === channelId) {
-            return {
-              ...ch,
-              participants: (ch.participants || []).filter((p: any) => {
-                const participantId = typeof p === 'string' ? p : p._id;
-                return participantId?.toString() !== currentUserId?.toString();
-              }),
-              subscriberCount: Math.max((ch.subscriberCount || 0) - 1, 0),
-            };
-          }
-          return ch;
-        })
-      );
-      
-      await fetchUserChannels();
-    } catch (error: any) {
-      console.error('Failed to unsubscribe:', error);
-    } finally {
-      setSubscribingChannels((prev) => {
-        const next = new Set(prev);
-        next.delete(channelId);
-        return next;
-      });
-    }
-  };
-
-  const isUserSubscribed = (channel: ChannelType): boolean => {
-    return channels.some((ch) => ch._id === channel._id);
-  };
-
   // Filter items based on search query
   const homeItems = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
+    const safeTime = (entry: any) => {
+      const ts = entry?.item?.lastMessage?.createdAt || entry?.item?.updatedAt || entry?.item?.createdAt;
+      return ts ? new Date(ts).getTime() : 0;
+    };
+
+    // Filter only Public Groups (Private groups are in Chats tab)
+    const filterChats = (c: any) => {
+        if (c.type === 'GROUP') {
+             return c.isPublic !== false; 
+        }
+        return false;
+    };
     
     if (!q) {
-      const items = [
-        ...(chats || []).map((c) => ({ kind: 'chat' as const, item: c })),
-        ...(channels || []).map((c) => ({ kind: 'channel' as const, item: c })),
-      ];
+      let items: any[] = [];
       
-      return items.sort((a, b) => {
-        const aTime = a.item.lastMessage?.createdAt
-          ? new Date(a.item.lastMessage.createdAt).getTime()
-          : 0;
-        const bTime = b.item.lastMessage?.createdAt
-          ? new Date(b.item.lastMessage.createdAt).getTime()
-          : 0;
-        return bTime - aTime;
-      });
+      if (filterType === 'all' || filterType === 'groups') {
+        items.push(...(chats || []).filter(filterChats).map((c) => ({ kind: 'chat' as const, item: c })));
+      }
+      
+      if (filterType === 'all' || filterType === 'channels') {
+        items.push(...(channels || []).filter(Boolean).map((c) => ({ kind: 'channel' as const, item: c })));
+      }
+      
+      if (filterType === 'all' || filterType === 'communities') {
+        items.push(...(communities || []).filter(Boolean).map((c) => ({ kind: 'community' as const, item: c })));
+      }
+      
+      return items.sort((a, b) => safeTime(b) - safeTime(a));
     }
     
     const searchTerm = q.startsWith('@') ? q.slice(1) : q;
     
     const matchedChats = (chats || [])
+      .filter(filterChats)
       .filter((chat) => {
         if (chat.type === 'GROUP') {
           const name = (chat.groupName || '').toLowerCase();
           return name.includes(searchTerm);
         } else {
-          const name = (chat.name || chat.participants?.[0]?.name || '').toLowerCase();
+          const name = (chat.participants?.[0]?.name || '').toLowerCase();
           return name.includes(searchTerm);
         }
       })
       .map((c) => ({ kind: 'chat' as const, item: c }));
     
     const matchedChannels = (channels || [])
+      .filter(Boolean)
       .filter((ch) => {
         const name = (ch.groupName || ch.name || '').toLowerCase();
         const username = (ch.channelUsername || '').toLowerCase();
         return name.includes(searchTerm) || username.includes(searchTerm);
       })
       .map((c) => ({ kind: 'channel' as const, item: c }));
-    
-    const merged = [...matchedChats, ...matchedChannels];
-    return merged.sort((a, b) => {
-      const aTime = a.item.lastMessage?.createdAt
-        ? new Date(a.item.lastMessage.createdAt).getTime()
-        : 0;
-      const bTime = b.item.lastMessage?.createdAt
-        ? new Date(b.item.lastMessage.createdAt).getTime()
-        : 0;
-      return bTime - aTime;
-    });
-  }, [chats, channels, searchQuery]);
-
-  const combinedItems = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    
-    if (!q) {
-      const items = [
-        ...(chats || []).map((c) => ({ kind: 'chat' as const, item: c })),
-        ...(channels || []).map((c) => ({ kind: 'channel' as const, item: c })),
-      ];
       
-      return items.sort((a, b) => {
-        const aTime = a.item.lastMessage?.createdAt
-          ? new Date(a.item.lastMessage.createdAt).getTime()
-          : 0;
-        const bTime = b.item.lastMessage?.createdAt
-          ? new Date(b.item.lastMessage.createdAt).getTime()
-          : 0;
-        return bTime - aTime;
-      });
-    }
-    
-    const matchedUsers = globalSearchResults.users.map((u: any) => ({
-      kind: 'user' as const,
-      item: u,
-    }));
-    const matchedChannels = globalSearchResults.channels.map((c: any) => ({
-      kind: 'channel' as const,
-      item: c,
-    }));
-    const matchedCommunities = globalSearchResults.communities.map((c: any) => ({
-      kind: 'community' as const,
-      item: c,
-    }));
-    const matchedGroups = globalSearchResults.groups.map((c: any) => ({
-      kind: 'chat' as const,
-      item: c,
-    }));
-    
-    const matchedPrivateChats = (chats || [])
-      .filter((chat) => {
-        if (chat.type === 'GROUP') return false;
-        const name = (chat.name || chat.participants?.[0]?.name || '').toLowerCase();
-        const username = (chat.participants?.[0]?.username || '').toLowerCase();
-        const cleanQuery = q.startsWith('@') ? q.slice(1) : q;
-        return name.includes(cleanQuery) || username.includes(cleanQuery);
+    const matchedCommunities = (communities || [])
+      .filter(Boolean)
+      .filter((c) => {
+        const name = (c.name || '').toLowerCase();
+        return name.includes(searchTerm);
       })
-      .map((c) => ({ kind: 'chat' as const, item: c }));
+      .map((c) => ({ kind: 'community' as const, item: c }));
     
-    const merged = [
-      ...matchedUsers,
-      ...matchedChannels,
-      ...matchedCommunities,
-      ...matchedGroups,
-      ...matchedPrivateChats,
-    ];
-    return merged.sort((a, b) => {
-      const aTime = a.item.lastMessage?.createdAt
-        ? new Date(a.item.lastMessage.createdAt).getTime()
-        : 0;
-      const bTime = b.item.lastMessage?.createdAt
-        ? new Date(b.item.lastMessage.createdAt).getTime()
-        : 0;
-      return bTime - aTime;
-    });
-  }, [chats, channels, searchQuery, globalSearchResults]);
+    const merged = [...matchedChats, ...matchedChannels, ...matchedCommunities];
+    return merged.sort((a, b) => safeTime(b) - safeTime(a));
+  }, [chats, channels, communities, searchQuery, filterType]);
+
+
 
   const styles = StyleSheet.create({
     container: {
@@ -431,10 +281,6 @@ const Home = () => {
     activeTabText: {
       color: colors.primaryForeground,
     },
-    sponsoredSection: {
-      marginBottom: 16,
-      paddingHorizontal: 16,
-    },
     sectionTitle: {
       fontSize: 14,
       fontWeight: '600',
@@ -442,16 +288,6 @@ const Home = () => {
       marginBottom: 12,
       flexDirection: 'row',
       alignItems: 'center',
-    },
-    sponsoredCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: `${colors.primary}15`,
-      borderRadius: 12,
-      padding: 12,
-      marginBottom: 8,
-      borderWidth: 1,
-      borderColor: `${colors.primary}30`,
     },
     channelIcon: {
       width: 48,
@@ -507,30 +343,6 @@ const Home = () => {
       borderRadius: 12,
       padding: 12,
       marginBottom: 8,
-    },
-    avatar: {
-      width: 48,
-      height: 48,
-      borderRadius: 12,
-      backgroundColor: colors.muted,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    avatarImage: {
-      width: 48,
-      height: 48,
-      borderRadius: 12,
-    },
-    onlineBadge: {
-      position: 'absolute',
-      bottom: 0,
-      right: 0,
-      width: 14,
-      height: 14,
-      borderRadius: 7,
-      backgroundColor: '#10b981',
-      borderWidth: 2,
-      borderColor: colors.card,
     },
     chatInfo: {
       flex: 1,
@@ -597,10 +409,145 @@ const Home = () => {
       padding: 8,
       marginLeft: 4,
     },
+    filterContainer: {
+      flexDirection: 'row',
+      paddingHorizontal: 0,
+      marginBottom: 12,
+      gap: 8,
+    },
+    filterChip: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    activeFilterChip: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    filterChipText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.foreground,
+    },
+    activeFilterChipText: {
+      color: colors.primaryForeground,
+    },
+    menuOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'flex-end',
+    },
+    menuContent: {
+      backgroundColor: colors.card,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      padding: 16,
+      paddingBottom: 32,
+    },
+    menuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 16,
+    },
+    menuItemText: {
+      fontSize: 16,
+      marginLeft: 12,
+      color: colors.foreground,
+    },
+    menuItemDestructive: {
+      color: '#ef4444',
+    },
+    errorText: {
+      color: '#ef4444',
+      textAlign: 'center',
+      marginBottom: 12,
+    },
+    retryButton: {
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      backgroundColor: colors.primary,
+      borderRadius: 8,
+      alignSelf: 'center',
+    },
+    retryButtonText: {
+      color: colors.primaryForeground,
+      fontWeight: '600',
+    },
   });
 
-  const totalItems = showDiscover ? combinedItems.length : homeItems.length;
-  const displayItems = showDiscover ? combinedItems : homeItems;
+  const handleAction = async (action: 'delete' | 'leave') => {
+    const { item } = contextMenu;
+    if (!item) return;
+
+    setContextMenu({ visible: false, item: null });
+
+    try {
+      if (action === 'delete') {
+        if (item.kind === 'chat') {
+           await chatApi.deleteChat(item.item._id);
+           await fetchChats(); 
+        } else if (item.kind === 'channel') {
+           await channelApi.delete(item.item._id);
+           await fetchUserChannels();
+        }
+      } else if (action === 'leave') {
+        if (item.kind === 'community') {
+           await communityApi.leaveCommunity(item.item._id, user?._id || '');
+           await fetchUserCommunities();
+        } else if (item.kind === 'chat') {
+           await chatApi.removeMember(item.item._id, user?._id || '');
+           await fetchChats();
+        } else if (item.kind === 'channel') {
+           await channelApi.unsubscribe(item.item._id, user?._id || '');
+           await fetchUserChannels();
+        }
+      }
+    } catch (error) {
+      console.error('Action failed', error);
+      Alert.alert('Error', 'Failed to perform action');
+    }
+  };
+
+  const confirmAction = (action: 'delete' | 'leave') => {
+    const { item } = contextMenu;
+    if (!item) return;
+    
+    let title = '';
+    let message = '';
+    
+    if (action === 'delete') {
+      if (item.kind === 'channel') {
+        title = 'Delete Channel';
+        message = 'Are you sure you want to delete this channel? This action cannot be undone.';
+      } else {
+        title = 'Delete Chat';
+        message = 'Are you sure you want to delete this chat? This action cannot be undone.';
+      }
+    } else {
+      if (item.kind === 'chat') {
+        title = 'Leave Group';
+        message = `Are you sure you want to leave this group?`;
+      } else {
+        title = item.kind === 'channel' ? 'Leave Channel' : 'Leave Community';
+        message = `Are you sure you want to leave this ${item.kind}?`;
+        if (item.kind === 'community') {
+           message += ' You will lose access to all chats within this community.';
+        }
+      }
+    }
+
+    Alert.alert(title, message, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: action === 'delete' ? 'Delete' : 'Leave', style: 'destructive', onPress: () => handleAction(action) }
+    ]);
+  };
+
+  const totalItems = homeItems.length;
+
+  const displayItems = homeItems;
 
   const renderChatItem = (entry: any) => {
     if (entry.kind === 'user') {
@@ -623,13 +570,12 @@ const Home = () => {
             }
           }}
         >
-          <View style={styles.avatar}>
-            {user.avatar ? (
-              <Image source={{ uri: user.avatar }} style={styles.avatarImage} />
-            ) : (
-              <UserIcon />
-            )}
-          </View>
+          <Avatar
+            uri={user.avatar}
+            name={user.name || 'U'}
+            size={48}
+            shape="rounded"
+          />
           <View style={styles.chatInfo}>
             <Text style={styles.chatName}>{user.name || 'User'}</Text>
             {user.username && (
@@ -652,13 +598,12 @@ const Home = () => {
           style={styles.chatItem}
           onPress={() => router.push(`/channel/${channel._id}`)}
         >
-          <View style={styles.avatar}>
-            {channel.icon ? (
-              <Image source={{ uri: channel.icon }} style={styles.avatarImage} />
-            ) : (
-              <ChannelIcon />
-            )}
-          </View>
+          <Avatar
+            uri={channel.icon}
+            name={channel.groupName || channel.name || 'C'}
+            size={48}
+            shape="rounded"
+          />
           <View style={styles.chatInfo}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Text style={styles.chatName}>
@@ -687,29 +632,15 @@ const Home = () => {
               </View>
             )}
           </View>
-          {showDiscover && (
-            <TouchableOpacity
-              style={[
-                styles.subscribeButton,
-                isSubscribed && styles.subscribedButton,
-              ]}
-              onPress={() =>
-                isSubscribed
-                  ? handleUnsubscribeFromChannel(channel._id)
-                  : handleSubscribeToChannel(channel._id)
-              }
-              disabled={isSubscribing}
-            >
-              <Text
-                style={[
-                  styles.subscribeButtonText,
-                  isSubscribed && styles.subscribedButtonText,
-                ]}
-              >
-                {isSubscribing ? '...' : isSubscribed ? 'Joined' : 'Join'}
-              </Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity 
+            style={{ padding: 8 }}
+            onPress={() => setContextMenu({ visible: true, item: entry })}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityLabel="More options"
+            accessibilityRole="button"
+          >
+             <Ionicons name="ellipsis-vertical" size={20} color={colors.mutedForeground} />
+          </TouchableOpacity>
         </TouchableOpacity>
       );
     } else if (entry.kind === 'chat') {
@@ -722,19 +653,17 @@ const Home = () => {
           key={chat._id}
           style={styles.chatItem}
           onPress={() =>
-            router.push(isGroup ? `/groups/${chat._id}` : `/chat/${chat._id}`)
-          }
+                router.push(`/chat/${chat._id}` as any)
+              }
         >
-          <View style={styles.avatar}>
-            {avatar ? (
-              <Image source={{ uri: avatar }} style={styles.avatarImage} />
-            ) : isGroup ? (
-              <GroupIcon />
-            ) : (
-              <UserIcon />
-            )}
-            {!isGroup && isOnline && <View style={styles.onlineBadge} />}
-          </View>
+          <Avatar
+            uri={avatar}
+            name={chat.name || chat.groupName || name || 'C'}
+            size={48}
+            shape="rounded"
+            isOnline={!isGroup && isOnline}
+            showStatus={!isGroup}
+          />
           <View style={styles.chatInfo}>
             <Text style={styles.chatName}>
               {chat.name || chat.groupName || name || 'Chat'}
@@ -757,6 +686,15 @@ const Home = () => {
               </View>
             )}
           </View>
+          <TouchableOpacity 
+            style={{ padding: 8 }}
+            onPress={() => setContextMenu({ visible: true, item: entry })}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityLabel="More options"
+            accessibilityRole="button"
+          >
+            <Ionicons name="ellipsis-vertical" size={20} color={colors.mutedForeground} />
+          </TouchableOpacity>
         </TouchableOpacity>
       );
     } else if (entry.kind === 'community') {
@@ -767,13 +705,12 @@ const Home = () => {
           style={styles.chatItem}
           onPress={() => router.push(`/community/${community._id}`)}
         >
-          <View style={styles.avatar}>
-            {community.icon ? (
-              <Image source={{ uri: community.icon }} style={styles.avatarImage} />
-            ) : (
-              <CommunityIcon />
-            )}
-          </View>
+          <Avatar
+            uri={community.icon}
+            name={community.name || 'C'}
+            size={48}
+            shape="rounded"
+          />
           <View style={styles.chatInfo}>
             <Text style={styles.chatName}>{community.name || 'Community'}</Text>
             {community.username && (
@@ -788,6 +725,15 @@ const Home = () => {
               {community.memberCount || community.members?.length || 0} members
             </Text>
           </View>
+          <TouchableOpacity 
+              style={{ padding: 8 }}
+              onPress={() => setContextMenu({ visible: true, item: entry })}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityLabel="More options"
+              accessibilityRole="button"
+            >
+              <Ionicons name="ellipsis-vertical" size={20} color={colors.mutedForeground} />
+          </TouchableOpacity>
         </TouchableOpacity>
       );
     }
@@ -811,27 +757,33 @@ const Home = () => {
           />
         </View>
 
-        {/* Tab Toggle */}
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[styles.tab, !showDiscover && styles.activeTab]}
-            onPress={() => setShowDiscover(false)}
-          >
-            <Text
-              style={[styles.tabText, !showDiscover && styles.activeTabText]}
+        {/* Filter Chips */}
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          contentContainerStyle={styles.filterContainer}
+          style={{ flexGrow: 0 }}
+        >
+          {(['all', 'groups', 'channels', 'communities'] as const).map((type) => (
+            <TouchableOpacity
+              key={type}
+              style={[
+                styles.filterChip,
+                filterType === type && styles.activeFilterChip
+              ]}
+              onPress={() => setFilterType(type)}
+              accessibilityLabel={`Filter by ${type}`}
+              accessibilityRole="button"
             >
-              Home
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, showDiscover && styles.activeTab]}
-            onPress={() => setShowDiscover(true)}
-          >
-            <Text style={[styles.tabText, showDiscover && styles.activeTabText]}>
-              Discover
-            </Text>
-          </TouchableOpacity>
-        </View>
+              <Text style={[
+                styles.filterChipText,
+                filterType === type && styles.activeFilterChipText
+              ]}>
+                {type.charAt(0).toUpperCase() + type.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
       <ScrollView
@@ -839,134 +791,137 @@ const Home = () => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {/* Sponsored Channels - only show if we have channels */}
-        {sponsoredChannels.length > 0 && (
-          <View style={styles.sponsoredSection}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-              <StarIcon />
-              <Text style={[styles.sectionTitle, { marginLeft: 4, marginBottom: 0 }]}>
-                Featured Channels
-              </Text>
-            </View>
-            {sponsoredChannels.map((channel) => {
-              const isSubscribed = isUserSubscribed(channel);
-              const isSubscribing = subscribingChannels.has(channel._id);
-              
-              return (
-                <TouchableOpacity
-                  key={channel._id}
-                  style={styles.sponsoredCard}
-                  onPress={() => router.push(`/channel/${channel._id}`)}
-                >
-                  {channel.icon ? (
-                    <Image
-                      source={{ uri: channel.icon }}
-                      style={styles.channelIconImage}
-                    />
-                  ) : (
-                    <View style={styles.channelIcon}>
-                      <ChannelIcon />
-                    </View>
-                  )}
-                  <View style={styles.channelInfo}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={styles.channelName}>
-                        {channel.groupName || channel.name}
-                      </Text>
-                      <View style={{ marginLeft: 4 }}>
-                        <VerifiedIcon />
-                      </View>
-                    </View>
-                    <Text style={styles.channelStats}>
-                      {channel.subscriberCount || 0} subscribers
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    style={[
-                      styles.subscribeButton,
-                      isSubscribed && styles.subscribedButton,
-                    ]}
-                    onPress={() =>
-                      isSubscribed
-                        ? handleUnsubscribeFromChannel(channel._id)
-                        : handleSubscribeToChannel(channel._id)
-                    }
-                    disabled={isSubscribing}
-                  >
-                    <Text
-                      style={[
-                        styles.subscribeButtonText,
-                        isSubscribed && styles.subscribedButtonText,
-                      ]}
-                    >
-                      {isSubscribing ? '...' : isSubscribed ? 'Joined' : 'Join'}
-                    </Text>
-                  </TouchableOpacity>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
-
         {/* Content */}
         <View style={styles.listContainer}>
-          {isChatsLoading || loadingChannels || isSearching ? (
+          {isChatsLoading || loadingChannels || loadingCommunities ? (
             <View style={styles.loader}>
               <ActivityIndicator size="large" color={colors.primary} />
             </View>
           ) : totalItems === 0 ? (
             <View style={styles.emptyContainer}>
               <Text style={{ fontSize: 48 }}>
-                {searchQuery.trim() ? '🔍' : '💬'}
+                {searchQuery.trim() ? '🔍' : '🏠'}
               </Text>
               <Text style={styles.emptyText}>
                 {searchQuery.trim()
                   ? `No results found for "${searchQuery}"`
-                  : showDiscover
-                  ? 'No channels to discover yet'
-                  : 'No chats yet'}
+                  : 'Welcome to your Home!'}
               </Text>
-              {searchQuery.trim() && (
-                <Text style={styles.emptySubtext}>
-                  Try searching with different keywords
-                </Text>
+              <Text style={styles.emptySubtext}>
+                {searchQuery.trim()
+                  ? 'Try searching with different keywords'
+                  : 'Join channels, groups, and communities to see them here.'}
+              </Text>
+              {!searchQuery.trim() && (
+                 <TouchableOpacity 
+                   style={[styles.retryButton, { marginTop: 20 }]} 
+                   onPress={() => router.push('/discover')}
+                 >
+                   <Text style={styles.retryButtonText}>Go to Discover</Text>
+                 </TouchableOpacity>
               )}
             </View>
           ) : (
             displayItems.map(renderChatItem)
           )}
-
-          {/* Recommended Channels in Discover Tab */}
-          {showDiscover &&
-            searchQuery.trim() &&
-            !isSearching &&
-            discoverChannels.length > 0 && (
-              <>
-                <Text style={[styles.sectionTitle, { marginTop: 24, marginBottom: 12 }]}>
-                  Recommended Channels
-                </Text>
-                {discoverChannels.slice(0, 5).map((channel) =>
-                  renderChatItem({ kind: 'channel', item: channel })
-                )}
-              </>
-            )}
-
-          {/* All Discover Channels */}
-          {showDiscover && !searchQuery.trim() && (
-            <>
-              {loadingDiscover ? (
-                <View style={styles.loader}>
-                  <ActivityIndicator size="large" color={colors.primary} />
-                </View>
-              ) : (
-                discoverChannels.map((channel) =>
-                  renderChatItem({ kind: 'channel', item: channel })
-                )
-              )}
-            </>
-          )}
         </View>
       </ScrollView>
+
+      {/* Context Menu Modal */}
+      <Modal
+        visible={contextMenu.visible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setContextMenu({ visible: false, item: null })}
+      >
+        <TouchableWithoutFeedback onPress={() => setContextMenu({ visible: false, item: null })}>
+          <View style={styles.menuOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={styles.menuContent}>
+                {contextMenu.item?.kind === 'chat' && (() => {
+                  const chat = contextMenu.item.item;
+                  const isGroup = chat.isGroup || chat.type === 'GROUP';
+                  
+                  if (!isGroup) {
+                    return (
+                      <TouchableOpacity 
+                        style={styles.menuItem}
+                        onPress={() => confirmAction('delete')}
+                      >
+                        <Ionicons name="trash-outline" size={24} color="#ef4444" />
+                        <Text style={[styles.menuItemText, styles.menuItemDestructive]}>Delete Chat</Text>
+                      </TouchableOpacity>
+                    );
+                  }
+
+                  const isOwner = chat.createdBy === user?._id || (typeof chat.createdBy === 'object' && (chat.createdBy as any)._id === user?._id);
+
+                  return (
+                    <>
+                      {!isOwner && (
+                         <TouchableOpacity 
+                           style={styles.menuItem}
+                           onPress={() => confirmAction('leave')}
+                         >
+                           <Ionicons name="log-out-outline" size={24} color="#ef4444" />
+                           <Text style={[styles.menuItemText, styles.menuItemDestructive]}>Leave Group</Text>
+                         </TouchableOpacity>
+                      )}
+                      {isOwner && (
+                         <TouchableOpacity 
+                           style={styles.menuItem}
+                           onPress={() => confirmAction('delete')}
+                         >
+                           <Ionicons name="trash-outline" size={24} color="#ef4444" />
+                           <Text style={[styles.menuItemText, styles.menuItemDestructive]}>Delete Group</Text>
+                         </TouchableOpacity>
+                      )}
+                    </>
+                  );
+                })()}
+
+                {contextMenu.item?.kind === 'channel' && (() => {
+                  const channel = contextMenu.item.item;
+                  const isOwner = channel.createdBy === user?._id || (typeof channel.createdBy === 'object' && (channel.createdBy as any)._id === user?._id);
+                  
+                  return (
+                    <>
+                      {!isOwner && (
+                        <TouchableOpacity 
+                          style={styles.menuItem}
+                          onPress={() => confirmAction('leave')}
+                        >
+                          <Ionicons name="log-out-outline" size={24} color="#ef4444" />
+                          <Text style={[styles.menuItemText, styles.menuItemDestructive]}>Leave Channel</Text>
+                        </TouchableOpacity>
+                      )}
+                      {isOwner && (
+                        <TouchableOpacity 
+                          style={styles.menuItem}
+                          onPress={() => confirmAction('delete')}
+                        >
+                          <Ionicons name="trash-outline" size={24} color="#ef4444" />
+                          <Text style={[styles.menuItemText, styles.menuItemDestructive]}>Delete Channel</Text>
+                        </TouchableOpacity>
+                      )}
+                    </>
+                  );
+                })()}
+
+                {contextMenu.item?.kind === 'community' && (
+                  <TouchableOpacity 
+                    style={styles.menuItem}
+                    onPress={() => confirmAction('leave')}
+                  >
+                    <Ionicons name="log-out-outline" size={24} color="#ef4444" />
+                    <Text style={[styles.menuItemText, styles.menuItemDestructive]}>Leave Community</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </View>
   );
 };

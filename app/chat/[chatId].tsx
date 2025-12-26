@@ -1,8 +1,11 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import GroupDetailsModal from '../../src/components/GroupDetailsModal';
+import MediaPreviewModal from '../../src/components/MediaPreviewModal';
+import { SmartImage } from '../../src/components/SmartImage';
+import { Avatar } from '../../src/components/Avatar';
 import { useSocket } from '../../src/hooks/useSocket';
 import { useAuthStore } from '../../src/store/authStore';
 import { useChatStore } from '../../src/store/chatStore';
@@ -10,11 +13,19 @@ import { useSocketStore } from '../../src/store/socketStore';
 import type { Message } from '../../src/types/chat.types';
 import { formatMessageTime, getOtherUserAndGroup } from '../../src/utils/helpers';
 import { useThemeColors } from '../../src/utils/theme';
+import { chatApi } from '../../src/services/api/chat';
+import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import { Video, ResizeMode } from 'expo-av'
+
+const MAX_VIDEO_SIZE = 50 * 1024 * 1024;
 
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const { chatId } = useLocalSearchParams<{ chatId: string }>();
-  const { currentChat, messages, fetchChat, sendMessage, addNewMessage, removeMessage, isSendingMessage, markAsRead } = useChatStore();
+  const { currentChat, messages, fetchChat, sendMessage, addNewMessage, removeMessage, isSendingMessage, markAsRead ,fetchChats,clearCurrentChat} = useChatStore();
   const { user } = useAuthStore();
   const { onlineUsers } = useSocketStore();
   const { socket } = useSocket({});
@@ -22,11 +33,32 @@ export default function ChatScreen() {
   const [messageText, setMessageText] = useState('');
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
-  const flatListRef = useRef<FlatList>(null);
   const typingTimeoutRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  const inputRef = useRef<TextInput>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const colors = useThemeColors();
+  const [pendingImage, setPendingImage] = useState<string | null>(null);
+  const [isPreviewVisible, setIsPreviewVisible] = useState(false);
+  const [previewMedia, setPreviewMedia] = useState<{ 
+    type: 'image' | 'video'; 
+    uri: string; 
+    base64?: string | null; 
+    name?: string; 
+    mimeType?: string; 
+    size?: number; 
+    width?: number; 
+    height?: number; 
+  } | null>(null);
+  const [isProcessingMedia, setIsProcessingMedia] = useState(false);
+  const flatListRef = useRef<FlatList>(null);
+  useEffect(() => {
+  return () => {
+    clearCurrentChat();
+    setTypingUsers([]);
+    setPendingImage(null);
+    setPreviewMedia(null);
+    setIsPreviewVisible(false);
+  };
+}, [chatId]);
 
   const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background, paddingTop: insets.top },
@@ -57,6 +89,9 @@ export default function ChatScreen() {
     replyPreview: { backgroundColor: colors.muted, padding: 10, borderRadius: 12, marginBottom: 9, borderLeftWidth: 4, borderLeftColor: colors.primary },
     replyText: { fontSize: 12, color: colors.mutedForeground, fontStyle: 'italic', fontWeight: '500' },
     mediaIndicator: { fontSize: 15, marginBottom: 5, color: colors.foreground, fontWeight: '600' },
+    mediaContainer: { marginTop: 8, backgroundColor: '#0b0b0b', borderRadius: 14, overflow: 'hidden' },
+    mediaImage: { width: 260, height: 260 },
+    mediaVideo: { width: 260, height: 260 },
     messageText: { fontSize: 16, color: colors.foreground, marginBottom: 5, lineHeight: 22 },
     myMessageText: { color: colors.primaryForeground },
     messageTime: { fontSize: 11, color: colors.mutedForeground, alignSelf: 'flex-end', fontWeight: '500' },
@@ -95,6 +130,66 @@ export default function ChatScreen() {
     typingIndicator: { flexDirection: 'row', paddingHorizontal: 14, paddingVertical: 10, alignItems: 'center', gap: 8 },
     typingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary },
     typingText: { fontSize: 13, color: colors.mutedForeground, marginLeft: 4, fontWeight: '500' },
+    systemMessageContainer: {
+      alignItems: 'center',
+      marginVertical: 8,
+      paddingHorizontal: 16,
+    },
+    systemMessageText: {
+      fontSize: 12,
+      color: colors.mutedForeground,
+      textAlign: 'center',
+      backgroundColor: colors.muted,
+      paddingHorizontal: 12,
+      paddingVertical: 4,
+      borderRadius: 10,
+      overflow: 'hidden',
+    },
+    pendingCard: {
+      marginHorizontal: 12,
+      marginTop: 12,
+      padding: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.card
+    },
+    pendingLabel: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: colors.foreground,
+      marginBottom: 8
+    },
+    pendingPreview: {
+      width: '100%',
+      height: 220,
+      borderRadius: 10,
+      marginBottom: 10
+    },
+    pendingActions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end'
+    },
+    pendingButton: {
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 10
+    },
+    pendingCancel: {
+      backgroundColor: colors.muted
+    },
+    pendingCancelText: {
+      color: colors.foreground,
+      fontWeight: '600'
+    },
+    pendingSend: {
+      backgroundColor: colors.primary,
+      marginLeft: 8
+    },
+    pendingSendText: {
+      color: colors.primaryForeground,
+      fontWeight: '700'
+    },
   });
 
   useEffect(() => {
@@ -103,6 +198,14 @@ export default function ChatScreen() {
       markAsRead(chatId);
     }
   }, [chatId]);
+
+  useEffect(() => {
+    if (messages.length > 0 && flatListRef.current) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: false });
+      }, 100);
+    }
+  }, [messages]);
 
   useEffect(() => {
     if (!socket || !chatId) return;
@@ -154,15 +257,6 @@ export default function ChatScreen() {
     }
   }, [chatId, joinChat, leaveChat]);
 
-  // Scroll to bottom when new message arrives
-  useEffect(() => {
-    if (messages.length > 0) {
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
-    }
-  }, [messages.length]);
-
   const handleSend = async () => {
     if (!messageText.trim() || !chatId) return;
     
@@ -186,6 +280,161 @@ export default function ChatScreen() {
     }
   };
 
+  
+  const handleDeleteChat = async () => {
+     if (!currentChat) return;
+     Alert.alert('Delete Chat', 'Permanently delete this conversation?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: async () => { 
+           try { 
+             await chatApi.deleteChat(currentChat._id); 
+             fetchChats(); 
+             router.replace('/(tab)'); 
+           } catch (e) { 
+             Alert.alert('Error', 'Failed to delete chat'); 
+           } 
+        } }
+     ]);
+  };
+
+  const handlePickImage = async () => {
+    try {
+      const res = await ImagePicker.launchImageLibraryAsync({
+        base64: true,
+        quality: 0.5,
+        allowsEditing: true,
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      });
+      if (res.canceled || !res.assets?.[0] || !chatId) return;
+
+      const asset = res.assets[0];
+      if (asset.fileSize && asset.fileSize > 5 * 1024 * 1024) {
+        Alert.alert('Error', 'Image too large. Maximum size is 5MB.');
+        return;
+      }
+
+      let imageBase64 = asset.base64;
+      if (!imageBase64 && asset.uri) {
+        try {
+          imageBase64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: 'base64' });
+        } catch (readError) {
+          console.error('Failed to read image as base64:', readError);
+        }
+      }
+
+      if (!imageBase64) {
+        Alert.alert('Error', 'Failed to process image');
+        return;
+      }
+
+      const finalImage = imageBase64.startsWith('data:')
+        ? imageBase64
+        : `data:image/jpeg;base64,${imageBase64}`;
+
+      setPendingImage(finalImage);
+    } catch (e) {
+      console.error('Image pick failed:', e);
+      Alert.alert('Error', 'Failed to select image');
+    }
+  };
+
+  const handleSendPendingImage = async () => {
+    if (!pendingImage || !chatId) return;
+    try {
+      await sendMessage({ chatId, image: pendingImage });
+      setPendingImage(null);
+    } catch (error) {
+      console.error('Failed to send image:', error);
+      Alert.alert('Error', 'Failed to send image');
+    }
+  };
+  
+
+  const handlePickVideo = async () => {
+    try {
+      const res = await DocumentPicker.getDocumentAsync({ type: 'video/*' });
+      
+      if (res.canceled) return;
+      
+      const asset = res.assets[0];
+      if (!asset || !chatId) return;
+
+      if (asset.size && asset.size > MAX_VIDEO_SIZE) {
+        Alert.alert('Error', 'Video too large. Maximum size is 50MB.');
+        return;
+      }
+
+      setPreviewMedia({
+        type: 'video',
+        uri: asset.uri,
+        name: asset.name,
+        mimeType: asset.mimeType,
+        size: asset.size
+      });
+      setIsPreviewVisible(true);
+    } catch (e) {
+      console.error('Video pick failed:', e);
+      Alert.alert('Error', 'Failed to select video');
+    }
+  };
+
+  const handleSendMedia = async (caption: string) => {
+    if (!previewMedia || !chatId) return;
+    
+    try {
+      if (previewMedia.type === 'image') {
+        let imageBase64 = previewMedia.base64;
+        if (!imageBase64 && previewMedia.uri) {
+          try {
+            imageBase64 = await FileSystem.readAsStringAsync(previewMedia.uri, { encoding: 'base64' });
+          } catch (readError) {
+            console.error('Failed to read image as base64:', readError);
+          }
+        }
+
+        if (!imageBase64) {
+          Alert.alert('Error', 'Failed to process image');
+          return;
+        }
+
+        const finalImage = imageBase64.startsWith('data:')
+          ? imageBase64
+          : `data:image/jpeg;base64,${imageBase64}`;
+
+        await sendMessage({
+          chatId,
+          image: finalImage,
+          content: caption.trim() || undefined,
+        });
+      } else {
+        // Video
+        const base64Data = await FileSystem.readAsStringAsync(previewMedia.uri, { encoding: 'base64' });
+        const mimeType = previewMedia.mimeType || 'video/mp4';
+        const finalData = `data:${mimeType};base64,${base64Data}`;
+
+        await sendMessage({
+          chatId,
+          video: { 
+            data: finalData, 
+            name: previewMedia.name || 'video', 
+            type: mimeType, 
+            size: previewMedia.size || 0 
+          },
+          content: caption.trim() || undefined
+        });
+      }
+      
+      setIsPreviewVisible(false);
+      setPreviewMedia(null);
+    } catch (error: any) {
+       console.error('Failed to send media:', error);
+       if (error.response) {
+         console.error('Error response:', error.response.status, error.response.data);
+       }
+       Alert.alert('Error', 'Failed to send media. Please try again.');
+    }
+  };
+
   const getTypingText = () => {
     if (typingUsers.length === 0) return '';
     if (typingUsers.length === 1) return 'Someone is typing...';
@@ -194,7 +443,26 @@ export default function ChatScreen() {
   };
 
   const renderMessage = ({ item }: { item: Message }) => {
+    if (item.messageType === 'SYSTEM') {
+      return (
+        <View style={styles.systemMessageContainer}>
+          <Text style={styles.systemMessageText}>
+            {item.content}
+          </Text>
+        </View>
+      );
+    }
+
     const isMyMessage = item.sender?._id === user?._id;
+    const imageSrc = item.image
+      ? {
+          uri:
+            item.image.startsWith('http') || item.image.startsWith('data:')
+              ? item.image
+              : `data:image/jpeg;base64,${item.image}`,
+        }
+      : null;
+    const videoUri = item.video?.url || null;
     
     return (
       <View style={[styles.messageContainer, isMyMessage && styles.myMessageContainer]}>
@@ -206,11 +474,27 @@ export default function ChatScreen() {
               </Text>
             </View>
           )}
-          {item.image && (
-            <Text style={styles.mediaIndicator}>📷 Image</Text>
+          {imageSrc && (
+            <View style={styles.mediaContainer}>
+              <SmartImage 
+                source={imageSrc} 
+                style={styles.mediaImage} 
+                contentFit="cover" 
+                showLoadingIndicator={true}
+              />
+            </View>
           )}
-          {item.video && (
-            <Text style={styles.mediaIndicator}>🎥 Video</Text>
+          {videoUri && (
+            <View style={styles.mediaContainer}>
+              <Video
+                source={{ uri: videoUri }}
+                style={styles.mediaVideo}
+                resizeMode={Platform.OS === 'web' ? ResizeMode.CONTAIN : ResizeMode.COVER}
+                useNativeControls
+                shouldPlay={false}
+                isLooping={false}
+              />
+            </View>
           )}
           {item.file && (
             <Text style={styles.mediaIndicator}>📎 {item.file.name}</Text>
@@ -265,6 +549,12 @@ export default function ChatScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
+        <Avatar
+          uri={getChatAvatar() || undefined}
+          name={getChatName()}
+          size={40}
+          style={{ marginRight: 10 }}
+        />
         <View style={styles.headerInfo}>
           <Text style={styles.headerTitle} numberOfLines={1}>
             {getChatName()}
@@ -273,11 +563,21 @@ export default function ChatScreen() {
             {getChatOnlineStatus() ? 'Online' : 'Offline'}
           </Text>
         </View>
-        {currentChat?.isGroup && (
-          <TouchableOpacity onPress={() => setIsGroupModalOpen(true)} style={{ padding: 8 }}>
-            <Text style={{ color: colors.primary }}>Group</Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity 
+          onPress={() => {
+            if (currentChat?.isGroup) {
+              setIsGroupModalOpen(true);
+            } else {
+              Alert.alert('Options', undefined, [
+                { text: 'Delete Chat', style: 'destructive', onPress: handleDeleteChat },
+                { text: 'Cancel', style: 'cancel' }
+              ]);
+            }
+          }} 
+          style={{ padding: 8 }}
+        >
+          <Ionicons name="ellipsis-vertical" size={24} color={colors.primary} />
+        </TouchableOpacity>
       </View>
       
       <FlatList
@@ -291,20 +591,53 @@ export default function ChatScreen() {
         keyboardShouldPersistTaps="handled"
         scrollEnabled={true}
         ListFooterComponent={
-          typingUsers.length > 0 ? (
-            <View style={styles.typingIndicator}>
-              <View style={styles.typingDot} />
-              <View style={styles.typingDot} />
-              <View style={styles.typingDot} />
-              <Text style={styles.typingText}>{getTypingText()}</Text>
-            </View>
-          ) : null
+          <>
+            {pendingImage && (
+              <View style={styles.pendingCard}>
+                <Text style={styles.pendingLabel}>Sending Image...</Text>
+                <SmartImage 
+                  source={pendingImage}
+                  containerStyle={styles.pendingPreview}
+                  contentFit="cover"
+                  showLoadingIndicator={true}
+                />
+                <View style={styles.pendingActions}>
+                  <TouchableOpacity 
+                    style={[styles.pendingButton, styles.pendingCancel]}
+                    onPress={() => setPendingImage(null)}
+                  >
+                    <Text style={styles.pendingCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.pendingButton, styles.pendingSend]}
+                    onPress={handleSendPendingImage}
+                    disabled={isSendingMessage}
+                  >
+                    <Text style={styles.pendingSendText}>Send</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+            {typingUsers.length > 0 ? (
+              <View style={styles.typingIndicator}>
+                <View style={styles.typingDot} />
+                <View style={styles.typingDot} />
+                <View style={styles.typingDot} />
+                <Text style={styles.typingText}>{getTypingText()}</Text>
+              </View>
+            ) : null}
+          </>
         }
       />
       
       <View style={styles.inputContainer}>
+        <TouchableOpacity style={{ paddingHorizontal: 12, paddingVertical: 10, borderRadius: 22, backgroundColor: colors.muted }} onPress={handlePickImage}>
+          <Text style={{ fontSize: 18, color: colors.foreground }}>📷</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={{ paddingHorizontal: 12, paddingVertical: 10, borderRadius: 22, backgroundColor: colors.muted }} onPress={handlePickVideo}>
+          <Text style={{ fontSize: 18, color: colors.foreground }}>🎥</Text>
+        </TouchableOpacity>
         <TextInput
-          ref={inputRef}
           style={styles.input}
           placeholder="Type a message..."
           placeholderTextColor={colors.mutedForeground}
@@ -323,6 +656,17 @@ export default function ChatScreen() {
       </View>
       
       <GroupDetailsModal visible={isGroupModalOpen} onClose={() => setIsGroupModalOpen(false)} chat={currentChat} />
+      
+      <MediaPreviewModal
+        visible={isPreviewVisible}
+        onClose={() => {
+          setIsPreviewVisible(false);
+          setPreviewMedia(null);
+        }}
+        onSend={handleSendMedia}
+        media={previewMedia}
+        isSending={isSendingMessage}
+      />
     </KeyboardAvoidingView>
   );
 }

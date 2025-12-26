@@ -32,4 +32,37 @@ export const channelApi = {
     const res = await apiClient.get(`/channel/${channelId}/info`);
     return res.data;
   },
+
+  update: async (
+    channelId: string,
+    data: { name?: string; description?: string; icon?: string; isPublic?: boolean; username?: string }
+  ) => {
+    const res = await apiClient.put(`/channel/${channelId}`, data);
+    return res.data;
+  },
+
+  delete: async (channelId: string) => {
+    const res = await apiClient.delete(`/channel/${channelId}`);
+    return res.data;
+  },
+
+  addSubscriber: async (channelId: string, userId: string) => {
+    const res = await apiClient.post(`/channel/${channelId}/add-subscriber`, { userId });
+    return res.data;
+  },
+
+  removeSubscriber: async (channelId: string, userId: string) => {
+    const res = await apiClient.post(`/channel/${channelId}/remove-subscriber`, { userId });
+    return res.data;
+  },
+
+  addAdmin: async (channelId: string, userId: string) => {
+    const res = await apiClient.post(`/channel/${channelId}/admin/${userId}/add`);
+    return res.data;
+  },
+
+  removeAdmin: async (channelId: string, userId: string) => {
+    const res = await apiClient.post(`/channel/${channelId}/admin/${userId}/remove`);
+    return res.data;
+  },
 };

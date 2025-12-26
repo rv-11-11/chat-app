@@ -5,8 +5,8 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  Image,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useRouter, useNavigation } from 'expo-router';
 import { useAuthStore } from '../../src/store/authStore';
@@ -15,6 +15,7 @@ import { useThemeColors } from '../../src/utils/theme';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import ProfileEditDialog from '../../src/components/ProfileEditDialog';
 import { isUserOnline } from '../../src/utils/helpers';
+import { Avatar } from '../../src/components/Avatar';
 
 export default function MyProfileScreen() {
   const { user } = useAuthStore();
@@ -24,7 +25,8 @@ export default function MyProfileScreen() {
   const colors = useThemeColors();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
-  const isOnline = user ? isUserOnline(user._id, onlineUsers) : false;
+  // Current user is always online
+  const isOnline = true;
 
   if (!user) {
     return (
@@ -81,14 +83,14 @@ export default function MyProfileScreen() {
         {/* Profile Avatar Section */}
         <View style={[styles.avatarSection, { borderBottomColor: colors.border }]}>
           <View style={styles.avatarContainer}>
-            {user.avatar ? (
-              <Image source={{ uri: user.avatar }} style={styles.avatarImage} />
-            ) : (
-              <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary }]}>
-                <Text style={styles.avatarText}>{getInitials(user.name || 'U')}</Text>
-              </View>
-            )}
-            {isOnline && <View style={styles.onlineBadge} />}
+            <Avatar
+              uri={user.avatar || undefined}
+              name={user.name || 'U'}
+              size={96}
+              isOnline={isOnline}
+              showStatus={true}
+              shape="circle"
+            />
           </View>
           <View style={styles.profileInfo}>
             <Text style={[styles.profileName, { color: colors.foreground }]}>

@@ -9,8 +9,7 @@ import {
 import { useRouter, useNavigation } from 'expo-router';
 import { useSettingsStore } from '../../src/store/settingsStore';
 import { useThemeColors } from '../../src/utils/theme';
-import { useI18nWithSettings } from '../../src/utils/i18n';
-import { LANGUAGES } from '../../src/utils/i18n';
+import { useI18nWithSettings,LANGUAGES } from '../../src/utils/i18n';
 import ThemeSelector from '../../src/components/ThemeSelector';
 import NotificationsPanel from '../../src/components/NotificationsPanel';
 import Switch from '../../src/components/Switch';

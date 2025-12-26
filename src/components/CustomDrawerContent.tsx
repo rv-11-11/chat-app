@@ -15,6 +15,7 @@ import { useSocketStore } from '../store/socketStore';
 import { useThemeStore } from '../store/themeStore';
 import { useThemeColors } from '../utils/theme';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { Avatar } from './Avatar';
 
 interface MenuItem {
   icon: string;
@@ -85,12 +86,15 @@ export default function CustomDrawerContent(props: any) {
             style={styles.profilePressable}
           >
             <View style={styles.avatarContainer}>
-              <View style={[styles.avatar, { backgroundColor: '#60a5fa' }]}>
-                <Text style={styles.avatarText}>
-                  {user?.name?.charAt(0)?.toUpperCase() || 'U'}
-                </Text>
-              </View>
-              {isOnline && <View style={styles.onlineBadge} />}
+              <Avatar
+                key={user?.avatar} // Force re-render on avatar change
+                uri={user?.avatar}
+                name={user?.name || 'U'}
+                size={50}
+                isOnline={isOnline}
+                showStatus={true}
+                showLoading={true}
+              />
             </View>
             <View style={styles.profileInfo}>
               <Text style={[styles.profileName, { color: sidebarForeground }]} numberOfLines={1}>

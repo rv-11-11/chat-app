@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import NewChatModal from '../../src/components/NewChatModal';
+import { Avatar } from '../../src/components/Avatar';
 import { useSocket } from '../../src/hooks/useSocket';
 import { useAuthStore } from '../../src/store/authStore';
 import { useChatStore } from '../../src/store/chatStore';
@@ -117,43 +118,11 @@ export default function ChatListScreen() {
       shadowRadius: 4, 
       elevation: 2,
     },
-    avatarContainer: { 
-      position: 'relative', 
-      marginRight: 16,
-    },
-    avatar: { 
-      width: 56, 
-      height: 56, 
-      borderRadius: 28, 
-      backgroundColor: colors.primary, 
-      justifyContent: 'center', 
-      alignItems: 'center',
-    },
-    avatarText: { 
-      color: colors.primaryForeground, 
-      fontSize: 20, 
-      fontWeight: '700',
-    },
-    onlineBadge: { 
-      position: 'absolute', 
-      bottom: 0, 
-      right: 0, 
-      width: 18, 
-      height: 18, 
-      borderRadius: 9, 
-      backgroundColor: '#10b981', 
-      borderWidth: 3, 
-      borderColor: colors.card, 
-      shadowColor: '#000', 
-      shadowOffset: { width: 0, height: 1 }, 
-      shadowOpacity: 0.25, 
-      shadowRadius: 2, 
-      elevation: 3,
-    },
     chatContent: { 
       flex: 1, 
       justifyContent: 'center',
       gap: 8,
+      marginLeft: 16,
     },
     chatHeader: { 
       flexDirection: 'row', 
@@ -269,7 +238,17 @@ export default function ChatListScreen() {
       const timeB = b.lastMessage?.createdAt ? new Date(b.lastMessage.createdAt).getTime() : 0;
       return timeB - timeA;
     })
-    .filter((chat) => !chat?.isGroup && chat.type !== 'CHANNEL'); // Only direct chats
+    .filter((chat) => {
+      // Show Direct chats and Private Groups (Group DMs)
+      if (chat.type === 'CHANNEL') return false;
+      if (chat.type === 'DIRECT') return true;
+      if (chat.type === 'GROUP') {
+        return chat.isPublic === false; 
+      }
+      // Fallback for older data structure where type might be missing but isGroup exists
+      if (chat.isGroup) return chat.isPublic === false;
+      return true; // Default to showing if unsure (likely direct)
+    });
 
   const getChatName = (chat: Chat): string => {
     const { name } = getOtherUserAndGroup(chat, user?._id || null, onlineUsers);
@@ -309,14 +288,13 @@ export default function ChatListScreen() {
         onPress={() => router.push(`/chat/${item._id}`)}
         activeOpacity={0.7}
       >
-        <View style={styles.avatarContainer}>
-          <View style={[styles.avatar, avatar && { backgroundColor: '#e0e0e0' }]}>
-            <Text style={styles.avatarText}>
-              {String(chatName).charAt(0).toUpperCase()}
-            </Text>
-          </View>
-          {isOnline ? <View style={styles.onlineBadge} /> : null}
-        </View>
+        <Avatar
+          uri={avatar || undefined}
+          name={chatName}
+          size={56}
+          isOnline={isOnline}
+          showStatus={true}
+        />
         <View style={styles.chatContent}>
           <View style={styles.chatHeader}>
             <Text style={styles.chatName} numberOfLines={1}>
@@ -383,6 +361,9 @@ export default function ChatListScreen() {
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <View style={styles.center}>
+            <Text style={{ fontSize: 48, marginBottom: 16 }}>
+              {searchQuery ? '🔍' : '💬'}
+            </Text>
             <Text style={styles.emptyText}>
               {searchQuery ? 'No chats found' : 'No chats yet'}
             </Text>

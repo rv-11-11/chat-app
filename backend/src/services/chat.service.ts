@@ -25,12 +25,13 @@ export const createChatService = async (
     isPublic?: boolean;
     allowInviteLinkJoin?: boolean;
     icon?: string;
+    strictMode?: boolean;
   }
 ) => {
   const { 
     participantId, isGroup, participants, groupName, 
     groupDescription, groupUsername, groupRules, groupTopic, groupCategory,
-    isPublic, icon, allowInviteLinkJoin 
+    isPublic, icon, allowInviteLinkJoin, strictMode
   } = body;
 
   let chat;
@@ -63,6 +64,7 @@ export const createChatService = async (
       isPublic: isPublic ?? false,
       icon: iconUrl,
       allowInviteLinkJoin: allowInviteLinkJoin ?? true,
+      strictMode: strictMode ?? false,
       admins: [userId],
       createdBy: userId,
     });
@@ -478,6 +480,7 @@ export const updateChatService = async (
     channelDescription?: string;
     isPublic?: boolean;
     allowInviteLinkJoin?: boolean;
+    strictMode?: boolean;
   }
 ) => {
   const chat = await ChatModel.findById(chatId);
@@ -515,6 +518,7 @@ export const updateChatService = async (
   if (data.isPublic !== undefined) chat.isPublic = data.isPublic;
   if (data.allowInviteLinkJoin !== undefined)
     chat.allowInviteLinkJoin = data.allowInviteLinkJoin;
+  if (data.strictMode !== undefined) chat.strictMode = data.strictMode;
 
   await chat.save();
 

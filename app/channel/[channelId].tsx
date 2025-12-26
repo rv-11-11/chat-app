@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState, useMemo } from 'react';
-import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, ScrollView } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, ScrollView, Modal, Alert } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import "../../global.css";
 import { useAuthStore } from '../../src/store/authStore';
 import { useChatStore } from '../../src/store/chatStore';
@@ -10,16 +10,30 @@ import { channelApi } from '../../src/services/api/channel';
 import { useThemeColors } from '../../src/utils/theme';
 import { formatMessageTime } from '../../src/utils/helpers';
 import type { Message } from '../../src/types/chat.types';
+import * as ImagePicker from 'expo-image-picker'
+import * as DocumentPicker from 'expo-document-picker'
+import * as FileSystem from 'expo-file-system/legacy'
+import { Video, ResizeMode } from 'expo-av'
+import { userApi } from '../../src/services/api/user';
+import { Ionicons } from '@expo/vector-icons';
+import { SmartImage } from '../../src/components/SmartImage';
+import { Avatar } from '../../src/components/Avatar';
 
 interface Channel {
   _id: string;
-  name: string;
+  name?: string;
+  groupName?: string;
+  channelUsername?: string;
+  channelDescription?: string;
   description?: string;
   icon?: string;
   admins: Array<string | { _id: string }>;
   participants: Array<string | { _id: string }>;
   createdBy?: string | { _id: string };
 }
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50MB
 
 export default function ChannelDetailScreen() {
   const insets = useSafeAreaInsets();
@@ -35,85 +49,32 @@ export default function ChannelDetailScreen() {
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [messageText, setMessageText] = useState('');
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
-
-  const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background, paddingTop: insets.top },
-    header: { 
-      flexDirection: 'row', 
-      alignItems: 'center', 
-      paddingHorizontal: 16, 
-      paddingVertical: 14, 
-      backgroundColor: colors.card, 
-      borderBottomWidth: 0.5, 
-      borderBottomColor: colors.border, 
-      shadowColor: '#000', 
-      shadowOffset: { width: 0, height: 2 }, 
-      shadowOpacity: 0.08, 
-      shadowRadius: 8, 
-      elevation: 3 
-    },
-    backButton: { marginRight: 12, padding: 12, borderRadius: 10, justifyContent: 'center', alignItems: 'center', minWidth: 44, minHeight: 44 },
-    backButtonText: { fontSize: 32, color: colors.primary, fontWeight: '800', textAlign: 'center', lineHeight: 40 },
-    headerInfo: { flex: 1 },
-    headerTitle: { fontSize: 19, fontWeight: '700', color: colors.foreground, letterSpacing: -0.3 },
-    headerSubtitle: { fontSize: 13, color: colors.mutedForeground, marginTop: 3, fontWeight: '500' },
-    center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    loadingText: { marginTop: 12, fontSize: 16, color: colors.mutedForeground, fontWeight: '500' },
-    messagesList: { paddingVertical: 12, paddingHorizontal: 8 },
-    messageContainer: { marginBottom: 10, alignItems: 'flex-start', paddingHorizontal: 6 },
-    myMessageContainer: { alignItems: 'flex-end' },
-    messageBubble: { maxWidth: '78%', backgroundColor: colors.card, borderRadius: 22, paddingHorizontal: 16, paddingVertical: 11, borderBottomLeftRadius: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 3 },
-    myMessageBubble: { backgroundColor: colors.primary, borderBottomLeftRadius: 22, borderBottomRightRadius: 4 },
-    messageText: { fontSize: 16, color: colors.foreground, marginBottom: 5, lineHeight: 22 },
-    myMessageText: { color: colors.primaryForeground },
-    messageTime: { fontSize: 11, color: colors.mutedForeground, alignSelf: 'flex-end', fontWeight: '500' },
-    myMessageTime: { color: 'rgba(255,255,255,0.75)' },
-    inputContainer: { 
-      flexDirection: 'row', 
-      paddingHorizontal: 14, 
-      paddingVertical: 12,
-      backgroundColor: colors.card, 
-      borderTopWidth: 0.5, 
-      borderTopColor: colors.border, 
-      alignItems: 'flex-end', 
-      gap: 10,
-    },
-    input: { 
-      flex: 1, 
-      borderWidth: 1.2, 
-      borderColor: colors.border, 
-      borderRadius: 22, 
-      paddingHorizontal: 18, 
-      paddingVertical: 12, 
-      maxHeight: 110, 
-      color: colors.foreground, 
-      backgroundColor: colors.muted, 
-      fontSize: 16,
-      fontWeight: '500',
-    },
-    sendButton: { backgroundColor: colors.primary, borderRadius: 22, paddingHorizontal: 22, paddingVertical: 12, justifyContent: 'center', alignItems: 'center', shadowColor: colors.primary, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 4 },
-    sendButtonDisabled: { opacity: 0.55 },
-    sendButtonText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 15 },
-    emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20 },
-    emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.foreground, marginBottom: 8, textAlign: 'center' },
-    emptyDescription: { fontSize: 14, color: colors.mutedForeground, textAlign: 'center' },
-    notSubscribedContainer: { flex: 1, justifyContent: 'flex-end' },
-    subscribeButton: { backgroundColor: colors.primary, paddingVertical: 14, alignItems: 'center', marginBottom: 16, marginHorizontal: 16, borderRadius: 12, shadowColor: colors.primary, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 4 },
-    subscribeButtonText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 16 },
-    readOnlyNotice: { paddingVertical: 12, backgroundColor: colors.muted, borderTopWidth: 0.5, borderTopColor: colors.border, alignItems: 'center' },
-    readOnlyText: { fontSize: 13, color: colors.mutedForeground, fontWeight: '500' },
-    typingIndicator: { flexDirection: 'row', paddingHorizontal: 14, paddingVertical: 10, alignItems: 'center', gap: 8 },
-    typingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary },
-    typingText: { fontSize: 13, color: colors.mutedForeground, marginLeft: 4, fontWeight: '500' },
-  });
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editUsername, setEditUsername] = useState('');
+  const [editIcon, setEditIcon] = useState('');
+  const [pendingImage, setPendingImage] = useState<string | null>(null);
+  
+  // Member search state
+  const [memberQuery, setMemberQuery] = useState('');
+  const [memberResults, setMemberResults] = useState<any[]>([]);
+  const [isSearchingMembers, setIsSearchingMembers] = useState(false);
+  const [processingUserIds, setProcessingUserIds] = useState<Set<string>>(new Set());
 
   const currentUserId = user?._id || null;
+  const isOwner = useMemo(() => {
+    if (!channel) return false;
+    return (typeof channel.createdBy === 'string' ? channel.createdBy : channel.createdBy?._id)?.toString() === currentUserId?.toString();
+  }, [channel, currentUserId]);
+
   const isAdmin = useMemo(() => {
     if (!channel) return false;
     return channel.admins.some((admin: string | { _id: string }) => 
       (typeof admin === 'string' ? admin : admin._id)?.toString() === currentUserId?.toString()
-    );
-  }, [channel, currentUserId]);
+    ) || isOwner;
+  }, [channel, currentUserId, isOwner]);
 
   const isSubscribed = useMemo(() => {
     if (!channel) return false;
@@ -131,6 +92,10 @@ export default function ChannelDetailScreen() {
       try {
         const res = await channelApi.getInfo(channelId);
         setChannel(res.channel);
+        setEditName(res.channel.name || res.channel.groupName || res.channel.channelUsername || '');
+        setEditDescription(res.channel.description || res.channel.channelDescription || '');
+        setEditIcon(res.channel.icon || '');
+        setEditUsername(res.channel.channelUsername || res.channel.username || '');
       } catch (error) {
         console.error('Failed to fetch channel info:', error);
       } finally {
@@ -193,17 +158,13 @@ export default function ChannelDetailScreen() {
 
   const handleSend = async () => {
     if (!messageText.trim() || !channelId) return;
-    
     const content = messageText.trim();
     setMessageText('');
-    
     try {
-      await sendMessage({
-        chatId: channelId,
-        content,
-      });
+      await sendMessage({ chatId: channelId, content });
     } catch (error) {
       console.error('Failed to send message:', error);
+      Alert.alert('Error', 'Failed to send message');
     }
   };
 
@@ -216,28 +177,513 @@ export default function ChannelDetailScreen() {
       // Refresh channel info to update participant status
       const res = await channelApi.getInfo(channelId);
       setChannel(res.channel);
+      Alert.alert('Success', 'You have joined the channel');
     } catch (error: any) {
       console.error('Failed to subscribe to channel:', error);
+      Alert.alert('Error', 'Failed to join channel');
     } finally {
       setIsSubscribing(false);
     }
   };
 
+  const handlePickImage = async () => {
+    try {
+      const res = await ImagePicker.launchImageLibraryAsync({
+        base64: true,
+        quality: 0.5,
+        allowsEditing: true,
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      });
+      if (res.canceled || !res.assets?.[0] || !channelId) return;
+
+      const asset = res.assets[0];
+      if (asset.fileSize && asset.fileSize > MAX_FILE_SIZE) {
+        Alert.alert('Error', 'Image too large. Maximum size is 5MB.');
+        return;
+      }
+
+      let imageBase64 = asset.base64;
+      if (!imageBase64 && asset.uri) {
+        try {
+          imageBase64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
+        } catch (readError) {
+          console.error('Failed to read image as base64:', readError);
+        }
+      }
+
+      if (!imageBase64) {
+        Alert.alert('Error', 'Failed to process image');
+        return;
+      }
+
+      // Ensure data URI prefix for Cloudinary
+      const finalImage = imageBase64.startsWith('data:') 
+        ? imageBase64 
+        : `data:image/jpeg;base64,${imageBase64}`;
+
+      setPendingImage(finalImage);
+    } catch (e) {
+      console.error('Image pick failed:', e);
+      Alert.alert('Error', 'Failed to select image');
+    }
+  };
+
+  const handleSendPendingImage = async () => {
+    if (!pendingImage || !channelId) return;
+    try {
+      await sendMessage({ chatId: channelId, image: pendingImage });
+      setPendingImage(null);
+    } catch (error) {
+      console.error('Failed to send image:', error);
+      Alert.alert('Error', 'Failed to send image');
+    }
+  };
+
+  const handlePickVideo = async () => {
+    try {
+      const res: any = await DocumentPicker.getDocumentAsync({ type: 'video/*' });
+      if ((res as any).canceled) return;
+      const asset = (res as any).assets?.[0] || (res as any);
+      if (!asset || !channelId) return;
+
+      if (asset.size && asset.size > MAX_VIDEO_SIZE) {
+        Alert.alert('Error', 'Video too large. Maximum size is 50MB.');
+        return;
+      }
+
+      const uri: string = asset.uri;
+      const name: string = asset.name || 'video';
+      const type: string = asset.mimeType || 'video/mp4';
+      const size: number = asset.size || 0;
+      const data = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+      await sendMessage({
+        chatId: channelId,
+        video: { data, name, type, size },
+      });
+    } catch (e) {
+      console.error('Video pick failed:', e);
+      Alert.alert('Error', 'Failed to select video');
+    }
+  };
+
+  const handleUpdateChannel = async () => {
+    if (!channel) return;
+    setIsUpdating(true);
+    try {
+      await channelApi.update(channel._id, {
+        name: editName,
+        description: editDescription,
+        icon: editIcon || undefined,
+        username: editUsername || undefined,
+      });
+      const res = await channelApi.getInfo(channel._id);
+      setChannel(res.channel);
+      setSettingsOpen(false);
+      Alert.alert('Success', 'Channel updated');
+    } catch (error: any) {
+      console.error('Update channel failed:', error);
+      Alert.alert('Update failed', error?.response?.data?.message || 'Could not update channel');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleLeaveChannel = async () => {
+    if (!channel) return;
+    Alert.alert('Leave channel', `Are you sure you want to leave ${channel.name}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Leave', style: 'destructive', onPress: async () => {
+          setIsSubscribing(true);
+          try {
+            await channelApi.unsubscribe(channel._id);
+            const res = await channelApi.getInfo(channel._id);
+            setChannel(res.channel);
+            Alert.alert('Left', 'You left the channel');
+          } catch (error: any) {
+            Alert.alert('Leave failed', error?.response?.data?.message || 'Unable to leave channel');
+          } finally {
+            setIsSubscribing(false);
+          }
+        }
+      }
+    ]);
+  };
+
+  const handleDeleteChannel = async () => {
+    if (!channel) return;
+    Alert.alert('Delete channel', `This will permanently delete ${channel.name}.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive', onPress: async () => {
+          try {
+            await channelApi.delete(channel._id);
+            Alert.alert('Deleted', 'Channel deleted successfully');
+            router.replace('/(tab)/channel');
+          } catch (error: any) {
+            Alert.alert('Delete failed', error?.response?.data?.message || 'Unable to delete channel');
+          }
+        }
+      }
+    ]);
+  };
+
+  const searchMembers = async (q: string) => {
+    setMemberQuery(q);
+    const query = q.trim();
+    if (!query) { setMemberResults([]); return; }
+    setIsSearchingMembers(true);
+    try {
+      const res = await userApi.searchUsers(query);
+      setMemberResults(res.users || []);
+    } catch (error) {
+      console.error('Search members failed', error);
+    } finally {
+      setIsSearchingMembers(false);
+    }
+  };
+
+  const handleAddSubscriber = async (userId: string) => {
+    if (!channel) return;
+    try {
+      await channelApi.addSubscriber(channel._id, userId);
+      const res = await channelApi.getInfo(channel._id);
+      setChannel(res.channel);
+      Alert.alert('Added', 'Subscriber added');
+    } catch (error: any) {
+      Alert.alert('Add failed', error?.response?.data?.message || 'Unable to add subscriber');
+    }
+  };
+
+  const handleRemoveSubscriber = async (userId: string) => {
+    if (!channel) return;
+    try {
+      await channelApi.removeSubscriber(channel._id, userId);
+      const res = await channelApi.getInfo(channel._id);
+      setChannel(res.channel);
+      Alert.alert('Removed', 'Subscriber removed');
+    } catch (error: any) {
+      Alert.alert('Remove failed', error?.response?.data?.message || 'Unable to remove subscriber');
+    }
+  };
+
+  const handlePromoteAdmin = async (userId: string) => {
+    if (!channel) return;
+    try {
+      await channelApi.addAdmin(channel._id, userId);
+      const res = await channelApi.getInfo(channel._id);
+      setChannel(res.channel);
+      Alert.alert('Promoted', 'User promoted to admin');
+    } catch (error: any) {
+      Alert.alert('Promote failed', error?.response?.data?.message || 'Unable to promote');
+    }
+  };
+
+  const handleDemoteAdmin = async (userId: string) => {
+    if (!channel) return;
+    try {
+      await channelApi.removeAdmin(channel._id, userId);
+      const res = await channelApi.getInfo(channel._id);
+      setChannel(res.channel);
+      Alert.alert('Demoted', 'Admin removed');
+    } catch (error: any) {
+      Alert.alert('Demote failed', error?.response?.data?.message || 'Unable to demote');
+    }
+  };
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: { 
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    center: { 
+      flex: 1, 
+      justifyContent: 'center', 
+      alignItems: 'center' 
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderBottomWidth: 0.5,
+      borderBottomColor: colors.border,
+      backgroundColor: colors.card,
+    },
+    backButton: { 
+      padding: 8, 
+      marginRight: 8 
+    },
+    backButtonText: { 
+      fontSize: 24, 
+      fontWeight: '600',
+      color: colors.foreground
+    },
+    headerInfo: { 
+      flex: 1 
+    },
+    headerTitle: { 
+      fontSize: 18, 
+      fontWeight: '700',
+      color: colors.foreground
+    },
+    headerSubtitle: { 
+      fontSize: 12, 
+      color: colors.mutedForeground 
+    },
+    headerActions: { 
+      flexDirection: 'row', 
+      gap: 12 
+    },
+    actionButton: { 
+      padding: 8 
+    },
+    actionButtonText: { 
+      fontSize: 20 
+    },
+    loadingText: { 
+      marginTop: 12, 
+      fontSize: 14, 
+      color: colors.mutedForeground 
+    },
+    messageText: { 
+      fontSize: 16,
+      color: colors.foreground
+    },
+    notSubscribedContainer: { 
+      flex: 1, 
+      justifyContent: 'center', 
+      alignItems: 'center', 
+      padding: 24 
+    },
+    emptyContainer: { 
+      alignItems: 'center', 
+      marginBottom: 24 
+    },
+    emptyTitle: { 
+      fontSize: 20, 
+      fontWeight: '700', 
+      marginBottom: 8,
+      color: colors.foreground
+    },
+    emptyDescription: { 
+      fontSize: 14, 
+      color: colors.mutedForeground, 
+      textAlign: 'center' 
+    },
+    subscribeButton: { 
+      backgroundColor: colors.primary, 
+      paddingHorizontal: 32, 
+      paddingVertical: 14, 
+      borderRadius: 30 
+    },
+    subscribeButtonText: { 
+      color: colors.primaryForeground, 
+      fontWeight: '700', 
+      fontSize: 16 
+    },
+    sendButtonDisabled: { 
+      opacity: 0.5 
+    },
+    messagesList: { 
+      padding: 16, 
+      paddingBottom: 100 
+    },
+    readOnlyNotice: { 
+      padding: 12, 
+      backgroundColor: colors.muted, 
+      alignItems: 'center' 
+    },
+    readOnlyText: { 
+      color: colors.mutedForeground, 
+      fontSize: 12 
+    },
+    inputContainer: { 
+      flexDirection: 'row', 
+      alignItems: 'center', 
+      padding: 12, 
+      borderTopWidth: 0.5, 
+      borderTopColor: colors.border, 
+      backgroundColor: colors.card,
+      paddingBottom: insets.bottom || 12
+    },
+    mediaButton: { 
+      padding: 10 
+    },
+    mediaButtonText: { 
+      fontSize: 20 
+    },
+    input: { 
+      flex: 1, 
+      maxHeight: 100, 
+      borderRadius: 20, 
+      backgroundColor: colors.muted, 
+      paddingHorizontal: 16, 
+      paddingVertical: 8, 
+      marginHorizontal: 8, 
+      fontSize: 16,
+      color: colors.foreground
+    },
+    sendButton: { 
+      padding: 10, 
+      backgroundColor: colors.primary, 
+      borderRadius: 20 
+    },
+    sendButtonText: { 
+      color: colors.primaryForeground, 
+      fontSize: 16, 
+      fontWeight: '700' 
+    },
+    messageContainer: { 
+      marginBottom: 12, 
+      flexDirection: 'row' 
+    },
+    myMessageContainer: { 
+      justifyContent: 'flex-end' 
+    },
+    messageBubble: { 
+      maxWidth: '80%', 
+      padding: 12, 
+      borderRadius: 16, 
+      backgroundColor: colors.muted 
+    },
+    myMessageBubble: { 
+      backgroundColor: colors.primary 
+    },
+    myMessageText: { 
+      color: colors.primaryForeground 
+    },
+    replyPreview: { 
+      padding: 8, 
+      backgroundColor: 'rgba(0,0,0,0.05)', 
+      borderRadius: 8, 
+      marginBottom: 8, 
+      borderLeftWidth: 2, 
+      borderLeftColor: colors.primary 
+    },
+    replyText: { 
+      fontSize: 12, 
+      color: colors.mutedForeground 
+    },
+    mediaContainer: { 
+      marginBottom: 8, 
+      borderRadius: 12, 
+      overflow: 'hidden' 
+    },
+    mediaImage: { 
+      width: 200, 
+      height: 200 
+    },
+    mediaVideo: { 
+      width: 200, 
+      height: 200 
+    },
+    pendingCard: {
+      marginHorizontal: 12,
+      marginTop: 12,
+      padding: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.card
+    },
+    pendingLabel: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: colors.foreground,
+      marginBottom: 8
+    },
+    pendingPreview: {
+      width: '100%',
+      height: 220,
+      borderRadius: 10,
+      marginBottom: 10
+    },
+    pendingActions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end'
+    },
+    pendingButton: {
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 10
+    },
+    pendingCancel: {
+      backgroundColor: colors.muted
+    },
+    pendingCancelText: {
+      color: colors.foreground,
+      fontWeight: '600'
+    },
+    pendingSend: {
+      backgroundColor: colors.primary,
+      marginLeft: 8
+    },
+    pendingSendText: {
+      color: colors.primaryForeground,
+      fontWeight: '700'
+    },
+    mediaIndicator: { 
+      fontSize: 12, 
+      color: colors.mutedForeground, 
+      marginBottom: 4 
+    },
+    messageTime: { 
+      fontSize: 10, 
+      color: colors.mutedForeground, 
+      alignSelf: 'flex-end', 
+      marginTop: 4 
+    },
+    myMessageTime: { 
+      color: 'rgba(255,255,255,0.7)' 
+    },
+  }), [colors]);
+
   const renderMessage = ({ item }: { item: Message }) => {
     const isMyMessage = item.sender?._id === user?._id;
-    
+    const imageSrc = item.image
+      ? (item.image.startsWith('http') ? { uri: item.image } : { uri: `data:image/jpeg;base64,${item.image}` })
+      : null;
+    const videoUri = item.video?.url || null;
+
     return (
       <View style={[styles.messageContainer, isMyMessage && styles.myMessageContainer]}>
         <View style={[styles.messageBubble, isMyMessage && styles.myMessageBubble]}>
-          {item.image && (
-            <Text style={styles.messageText}>📷 Image</Text>
+          {item.replyTo && (
+            <View style={styles.replyPreview}>
+              <Text style={styles.replyText} numberOfLines={1}>
+                {item.replyTo.content || 'Message'}
+              </Text>
+            </View>
           )}
-          {item.video && (
-            <Text style={styles.messageText}>🎥 Video</Text>
+
+          {imageSrc && (
+            <View style={styles.mediaContainer}>
+              <SmartImage source={imageSrc} style={styles.mediaImage} contentFit="cover" />
+            </View>
           )}
-          <Text style={[styles.messageText, isMyMessage && styles.myMessageText]}>
-            {item.content}
-          </Text>
+
+          {videoUri && (
+            <View style={styles.mediaContainer}>
+              <Video
+                source={{ uri: videoUri }}
+                style={styles.mediaVideo}
+                resizeMode={Platform.OS === 'web' ? ResizeMode.CONTAIN : ResizeMode.COVER}
+                useNativeControls
+                shouldPlay={false}
+                isLooping={false}
+              />
+            </View>
+          )}
+
+          {item.file && (
+            <Text style={styles.mediaIndicator}>📎 {item.file.name}</Text>
+          )}
+          {item.content && (
+            <Text style={[styles.messageText, isMyMessage && styles.myMessageText]}>
+              {item.content}
+            </Text>
+          )}
           <Text style={[styles.messageTime, isMyMessage && styles.myMessageTime]}>
             {formatMessageTime(item.createdAt)}
           </Text>
@@ -284,17 +730,38 @@ export default function ChannelDetailScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backButtonText}>‹</Text>
+          <Ionicons name="chevron-back" size={24} color={colors.foreground} />
         </TouchableOpacity>
+        <Avatar
+          uri={channel.icon}
+          name={channel.name || channel.groupName || channel.channelUsername || 'C'}
+          size={40}
+          style={{ marginRight: 12 }}
+          shape="rounded"
+        />
         <View style={styles.headerInfo}>
-          <Text style={styles.headerTitle}>{channel.name}</Text>
+          <Text style={styles.headerTitle}>{channel.name || channel.groupName || channel.channelUsername || 'Channel'}</Text>
           <Text style={styles.headerSubtitle}>
             {isSubscribed ? `${channel.participants.length} subscriber${channel.participants.length !== 1 ? 's' : ''}` : 'Channel'}
           </Text>
+        </View>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => router.push('/')}
+          >
+            <Ionicons name="search" size={24} color={colors.foreground} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => setSettingsOpen(true)}
+          >
+             <Ionicons name="settings-outline" size={24} color={colors.foreground} />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -328,7 +795,7 @@ export default function ChannelDetailScreen() {
             </View>
           ) : (
             <FlatList
-              data={messages}
+              data={messages.filter(m => m.messageType !== 'SYSTEM')}
               renderItem={renderMessage}
               keyExtractor={(item) => item._id}
               contentContainerStyle={styles.messagesList}
@@ -349,9 +816,29 @@ export default function ChannelDetailScreen() {
               behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
               keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
             >
+              {pendingImage && (
+                <View style={styles.pendingCard}>
+                  <Text style={styles.pendingLabel}>Ready to send</Text>
+                  <SmartImage source={{ uri: pendingImage }} style={styles.pendingPreview} contentFit="cover" />
+                  <View style={styles.pendingActions}>
+                    <TouchableOpacity style={[styles.pendingButton, styles.pendingCancel]} onPress={() => setPendingImage(null)}>
+                      <Text style={styles.pendingCancelText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.pendingButton, styles.pendingSend]} onPress={handleSendPendingImage} disabled={isSendingMessage}>
+                      <Text style={styles.pendingSendText}>{isSendingMessage ? 'Sending...' : 'Send image'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
               <View style={styles.inputContainer}>
+                <TouchableOpacity style={styles.mediaButton} onPress={handlePickImage} disabled={isSendingMessage}>
+                  <Ionicons name="image-outline" size={24} color={colors.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.mediaButton} onPress={handlePickVideo} disabled={isSendingMessage}>
+                  <Ionicons name="videocam-outline" size={24} color={colors.primary} />
+                </TouchableOpacity>
                 <TextInput
-                  ref={(ref) => ref?.setNativeProps({ style: styles.input })}
                   style={styles.input}
                   placeholder="Broadcast a message..."
                   placeholderTextColor={colors.mutedForeground}
@@ -366,15 +853,230 @@ export default function ChannelDetailScreen() {
                   onPress={handleSend}
                   disabled={isSendingMessage || !messageText.trim()}
                 >
-                  <Text style={styles.sendButtonText}>
-                    {isSendingMessage ? '⏳' : '✓'}
-                  </Text>
+                  <Ionicons name="send" size={20} color={colors.primaryForeground} />
                 </TouchableOpacity>
               </View>
             </KeyboardAvoidingView>
           )}
         </>
       )}
-    </View>
+
+      {/* Settings Modal */}
+      {settingsOpen && (
+        <Modal transparent animationType="fade" visible={settingsOpen} onRequestClose={() => setSettingsOpen(false)}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 }}>
+            <View style={{ backgroundColor: colors.card, borderRadius: 16, overflow: 'hidden', maxHeight: '80%' }}>
+              <View style={{ padding: 16, borderBottomWidth: 0.5, borderBottomColor: colors.border }}>
+                <Text style={{ fontSize: 18, fontWeight: '700', color: colors.foreground }}>Channel Settings</Text>
+                <Text style={{ fontSize: 13, color: colors.mutedForeground, marginTop: 4 }}>Manage profile, members and actions</Text>
+              </View>
+
+              <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
+                {/* Profile edit */}
+                <View style={{ gap: 8 }}>
+                  <Text style={{ color: colors.mutedForeground, fontWeight: '600' }}>Profile</Text>
+                  {isAdmin ? (
+                    <>
+                      <TextInput style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: colors.foreground }} placeholder="Name" placeholderTextColor={colors.mutedForeground} value={editName} onChangeText={setEditName} />
+                      <TextInput style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: colors.foreground }} placeholder="Description" placeholderTextColor={colors.mutedForeground} value={editDescription} onChangeText={setEditDescription} multiline />
+                      <TextInput style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: colors.foreground }} placeholder="Username (optional)" placeholderTextColor={colors.mutedForeground} value={editUsername} onChangeText={setEditUsername} />
+                      <TextInput style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: colors.foreground }} placeholder="Icon URL (optional)" placeholderTextColor={colors.mutedForeground} value={editIcon} onChangeText={setEditIcon} />
+                      <View style={{ flexDirection: 'row', gap: 10 }}>
+                        <TouchableOpacity style={{ backgroundColor: colors.primary, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, flex: 1, alignItems: 'center' }} onPress={handleUpdateChannel} disabled={isUpdating}>
+                          <Text style={{ color: colors.primaryForeground, fontWeight: '700' }}>{isUpdating ? 'Saving...' : 'Save'}</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  ) : (
+                    <View style={{ padding: 12, backgroundColor: colors.muted, borderRadius: 10 }}>
+                       <Text style={{ fontSize: 16, fontWeight: '600', color: colors.foreground, marginBottom: 4 }}>{channel?.name || channel?.groupName || channel?.channelUsername}</Text>
+                       {channel?.description || channel?.channelDescription ? (
+                         <Text style={{ color: colors.mutedForeground }}>{channel.description || channel.channelDescription}</Text>
+                       ) : (
+                         <Text style={{ color: colors.mutedForeground, fontStyle: 'italic' }}>No description</Text>
+                       )}
+                     </View>
+                  )}
+                </View>
+
+                  {/* Members overview */}
+                <View style={{ gap: 6 }}>
+                  <Text style={{ color: colors.mutedForeground, fontWeight: '600' }}>Members</Text>
+                  <Text style={{ color: colors.mutedForeground }}>{(channel?.participants || []).length} subscribers • {Array.isArray(channel?.admins) ? channel!.admins.length : 0} admins</Text>
+                  
+                  {/* Notification Preferences */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}>
+                    <Text style={{ color: colors.foreground, fontSize: 16 }}>Notifications</Text>
+                    <TouchableOpacity 
+                      onPress={() => Alert.alert('Notifications', 'Notification settings updated')}
+                      style={{ backgroundColor: colors.muted, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 }}
+                    >
+                      <Text style={{ color: colors.foreground, fontSize: 12, fontWeight: '600' }}>On</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Admin-only actions */}
+                  {isAdmin && (
+                    <View style={{ gap: 8 }}>
+                      <Text style={{ color: colors.mutedForeground, fontWeight: '600' }}>Manage Members</Text>
+                      <TextInput
+                        placeholder="Search by name or @username"
+                        placeholderTextColor={colors.mutedForeground}
+                        value={memberQuery}
+                        onChangeText={searchMembers}
+                        style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: colors.foreground }}
+                      />
+                      {isSearchingMembers ? (
+                        <View style={{ paddingVertical: 10 }}>
+                          <ActivityIndicator size="small" color={colors.primary} />
+                        </View>
+                      ) : (
+                        memberResults.length > 0 && (
+                          <View style={{ gap: 6 }}>
+                            {memberResults.map((u: any) => {
+                              const uid = (u._id || u.id || '').toString();
+                              const isSub = (channel?.participants || []).some((p: any) => ((typeof p === 'string' ? p : p?._id)?.toString()) === uid);
+                              const isAdm = (channel?.admins || []).some((a: any) => ((typeof a === 'string' ? a : a?._id)?.toString()) === uid);
+                              const processing = processingUserIds.has(uid);
+                              return (
+                                <View key={`search-${uid}`} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 }}>
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                    <Avatar
+                                      uri={u.avatar}
+                                      name={u.username || u.name || 'U'}
+                                      size={32}
+                                    />
+                                    <View>
+                                      <Text style={{ color: colors.foreground, fontWeight: '600' }}>{u.name || u.username}</Text>
+                                      {u.username && <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>@{u.username}</Text>}
+                                    </View>
+                                  </View>
+                                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                                    {!isSub && (
+                                      <TouchableOpacity disabled={processing} onPress={async () => { setProcessingUserIds(prev => new Set(prev).add(uid)); await handleAddSubscriber(uid); setProcessingUserIds(prev => { const n = new Set(prev); n.delete(uid); return n; }); }} style={{ backgroundColor: colors.primary, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
+                                        <Text style={{ color: colors.primaryForeground, fontWeight: '600' }}>{processing ? '...' : 'Add'}</Text>
+                                      </TouchableOpacity>
+                                    )}
+                                    {isSub && !isAdm && (
+                                      <TouchableOpacity disabled={processing} onPress={async () => { setProcessingUserIds(prev => new Set(prev).add(uid)); await handlePromoteAdmin(uid); setProcessingUserIds(prev => { const n = new Set(prev); n.delete(uid); return n; }); }} style={{ backgroundColor: colors.muted, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
+                                        <Text style={{ color: colors.foreground, fontWeight: '600' }}>{processing ? '...' : 'Promote'}</Text>
+                                      </TouchableOpacity>
+                                    )}
+                                    {isSub && (
+                                      <TouchableOpacity disabled={processing} onPress={async () => { setProcessingUserIds(prev => new Set(prev).add(uid)); await handleRemoveSubscriber(uid); setProcessingUserIds(prev => { const n = new Set(prev); n.delete(uid); return n; }); }} style={{ backgroundColor: colors.muted, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
+                                        <Text style={{ color: colors.foreground, fontWeight: '600' }}>{processing ? '...' : 'Remove'}</Text>
+                                      </TouchableOpacity>
+                                    )}
+                                    {isAdm && (
+                                      <TouchableOpacity disabled={processing} onPress={async () => { setProcessingUserIds(prev => new Set(prev).add(uid)); await handleDemoteAdmin(uid); setProcessingUserIds(prev => { const n = new Set(prev); n.delete(uid); return n; }); }} style={{ backgroundColor: '#eab308', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
+                                        <Text style={{ color: '#000', fontWeight: '700' }}>{processing ? '...' : 'Demote'}</Text>
+                                      </TouchableOpacity>
+                                    )}
+                                  </View>
+                                </View>
+                              );
+                            })}
+                          </View>
+                        )
+                      )}
+
+                      {/* Current Members */}
+                      <Text style={{ color: colors.mutedForeground, fontWeight: '600', marginTop: 8 }}>Current subscribers</Text>
+                      <View style={{ gap: 6 }}>
+                        {(channel?.participants || []).map((p: any) => {
+                          const pid = (typeof p === 'string' ? p : p?._id)?.toString();
+                          const displayName = (typeof p === 'object' && (p.name || p.username)) ? (p.name || p.username) : 'User';
+                          const isAdm = (channel?.admins || []).some((a: any) => ((typeof a === 'string' ? a : a?._id)?.toString()) === pid);
+                          const processing = processingUserIds.has(pid!);
+                          return (
+                            <View key={`sub-${pid}`} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                <Avatar
+                                  uri={typeof p === 'object' ? p.avatar : undefined}
+                                  name={displayName}
+                                  size={28}
+                                />
+                                <View>
+                                  <Text style={{ color: colors.foreground }}>{displayName}</Text>
+                                  {typeof p === 'object' && p.username && <Text style={{ color: colors.mutedForeground, fontSize: 10 }}>@{p.username}</Text>}
+                                </View>
+                              </View>
+                              <View style={{ flexDirection: 'row', gap: 8 }}>
+                                {!isAdm && (
+                                  <TouchableOpacity disabled={processing} onPress={async () => { setProcessingUserIds(prev => new Set(prev).add(pid!)); await handlePromoteAdmin(pid!); setProcessingUserIds(prev => { const n = new Set(prev); n.delete(pid!); return n; }); }} style={{ backgroundColor: colors.muted, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
+                                    <Text style={{ color: colors.foreground, fontWeight: '600' }}>{processing ? '...' : 'Promote'}</Text>
+                                  </TouchableOpacity>
+                                )}
+                                <TouchableOpacity disabled={processing} onPress={async () => { setProcessingUserIds(prev => new Set(prev).add(pid!)); await handleRemoveSubscriber(pid!); setProcessingUserIds(prev => { const n = new Set(prev); n.delete(pid!); return n; }); }} style={{ backgroundColor: colors.muted, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
+                                  <Text style={{ color: colors.foreground, fontWeight: '600' }}>{processing ? '...' : 'Remove'}</Text>
+                                </TouchableOpacity>
+                              </View>
+                            </View>
+                          );
+                        })}
+                      </View>
+
+                      {/* Admins */}
+                      <Text style={{ color: colors.mutedForeground, fontWeight: '600', marginTop: 8 }}>Admins</Text>
+                      <View style={{ gap: 6 }}>
+                        {(channel?.admins || []).map((a: any) => {
+                          const aid = (typeof a === 'string' ? a : a?._id)?.toString();
+                          const displayName = (typeof a === 'object' && (a.name || a.username)) ? (a.name || a.username) : 'Admin';
+                          const processing = processingUserIds.has(aid!);
+                          const isSelf = aid === (user?._id || '').toString();
+                          return (
+                            <View key={`adm-${aid}`} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                <Avatar
+                                  uri={typeof a === 'object' ? a.avatar : undefined}
+                                  name={displayName}
+                                  size={28}
+                                />
+                                <View>
+                                  <Text style={{ color: colors.foreground }}>{displayName}</Text>
+                                  {typeof a === 'object' && a.username && <Text style={{ color: colors.mutedForeground, fontSize: 10 }}>@{a.username}</Text>}
+                                </View>
+                              </View>
+                              {!isSelf && (
+                                <TouchableOpacity disabled={processing} onPress={async () => { setProcessingUserIds(prev => new Set(prev).add(aid!)); await handleDemoteAdmin(aid!); setProcessingUserIds(prev => { const n = new Set(prev); n.delete(aid!); return n; }); }} style={{ backgroundColor: '#eab308', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
+                                  <Text style={{ color: '#000', fontWeight: '700' }}>{processing ? '...' : 'Demote'}</Text>
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  )}
+                </View>
+
+                {/* Leave/Delete Button */}
+                {isOwner ? (
+                  <TouchableOpacity 
+                    style={{ backgroundColor: '#fee2e2', padding: 12, borderRadius: 10, alignItems: 'center', marginTop: 20 }} 
+                    onPress={handleDeleteChannel}
+                  >
+                    <Text style={{ color: '#ef4444', fontWeight: '700' }}>Delete Channel</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity 
+                    style={{ backgroundColor: colors.primary + '20', padding: 12, borderRadius: 10, alignItems: 'center', marginTop: 20 }} 
+                    onPress={handleLeaveChannel}
+                  >
+                    <Text style={{ color: colors.primary, fontWeight: '700' }}>Leave Channel</Text>
+                  </TouchableOpacity>
+                )}
+              </ScrollView>
+
+              <View style={{ flexDirection: 'row', gap: 10, padding: 12, borderTopWidth: 0.5, borderTopColor: colors.border }}>
+                <TouchableOpacity style={{ flex: 1, backgroundColor: colors.muted, borderRadius: 10, paddingVertical: 10, alignItems: 'center' }} onPress={() => setSettingsOpen(false)}>
+                  <Text style={{ color: colors.foreground, fontWeight: '600' }}>Close</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+    </SafeAreaView>
   );
 }

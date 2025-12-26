@@ -156,10 +156,11 @@ export const deleteChatController = asyncHandler(
 
 export const updateChatController = asyncHandler(
   async (req: Request, res: Response) => {
+    // Update chat settings
     const userId = req.user?._id;
     const { id } = chatIdSchema.parse(req.params);
     const { 
-      groupName, icon, channelDescription, isPublic, allowInviteLinkJoin,
+      groupName, icon, channelDescription, isPublic, allowInviteLinkJoin, strictMode,
       groupDescription, groupUsername, groupRules, groupTopic, groupCategory 
     } = req.body;
 
@@ -174,6 +175,7 @@ export const updateChatController = asyncHandler(
       channelDescription,
       isPublic,
       allowInviteLinkJoin,
+      strictMode,
     });
 
     return res.status(HTTPSTATUS.OK).json({

@@ -11,6 +11,8 @@ export interface Chat {
   groupName?: string;
   groupUsername?: string;
   channelDescription?: string;
+  description?: string; // Unified description field
+  name?: string; // Unified name field
   channelUsername?: string;
   icon?: string;
   admins: (string | User)[];
@@ -20,6 +22,7 @@ export interface Chat {
   unreadBy?: string[];
   unreadCount?: number;
   allowInviteLinkJoin?: boolean;
+  strictMode?: boolean;
   isFeatured?: boolean;
   featuredUntil?: Date;
   createdAt: string;
@@ -62,7 +65,9 @@ export interface CreateChatData {
   icon?: string;
   type?: ChatType;
   description?: string;
+  groupDescription?: string;
   isPublic?: boolean;
+  strictMode?: boolean;
 }
 
 export interface CreateMessageData {

@@ -38,6 +38,23 @@ export const communityApi = {
     return response.data;
   },
 
+  updateCommunity: async (
+    communityId: string,
+    data: Partial<{
+      name: string;
+      description?: string;
+      icon?: string;
+      isPublic?: boolean;
+      allowInviteLinkJoin?: boolean;
+    }>
+  ): Promise<{ community: CommunityType }> => {
+    const response = await apiClient.put<{ community: CommunityType }>(
+      `/community/${communityId}`,
+      data
+    );
+    return response.data;
+  },
+
   createCommunity: async (
     data: CreateCommunityData
   ): Promise<{ community: CommunityType }> => {
@@ -92,9 +109,8 @@ export const communityApi = {
     communityId: string,
     chatId: string
   ): Promise<{ community: CommunityType }> => {
-    const response = await apiClient.post<{ community: CommunityType }>(
-      `/community/${communityId}/remove-chat`,
-      { chatId }
+    const response = await apiClient.delete<{ community: CommunityType }>(
+      `/community/${communityId}/chat/${chatId}`
     );
     return response.data;
   },
