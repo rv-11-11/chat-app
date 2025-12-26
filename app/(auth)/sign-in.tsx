@@ -216,7 +216,7 @@ export default function SignInScreen() {
             activeOpacity={0.7}
           >
             <Text style={styles.linkText}>
-              Don't have an account? <Text style={styles.linkTextBold}>Create one</Text>
+              Do not have an account? <Text style={styles.linkTextBold}>Create one</Text>
             </Text>
           </TouchableOpacity>
         </View>

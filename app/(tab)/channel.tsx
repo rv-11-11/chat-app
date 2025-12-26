@@ -33,10 +33,6 @@ const ChannelItem = ({
   const isOwner = item.createdBy === user?._id;
   const isAdmin = (item.admins || []).some((a: any) => (typeof a === 'string' ? a : a._id) === user?._id) || isOwner;
   const isMember = myChannels.some((c: Chat) => c._id === item._id);
-
-  // Filter out joined channels from 'Discover' tab
-  if (activeTab === 'public' && isMember) return null;
-
   // Animation values
   const animatedOpacity = useRef(new Animated.Value(0)).current;
   const animatedTranslateY = useRef(new Animated.Value(10)).current;
@@ -57,6 +53,9 @@ const ChannelItem = ({
       }),
     ]).start();
   }, []);
+
+  // Filter out joined channels from 'Discover' tab after hooks to keep hook order stable
+  if (activeTab === 'public' && isMember) return null;
 
   return (
     <Animated.View style={{ opacity: animatedOpacity, transform: [{ translateY: animatedTranslateY }] }}>

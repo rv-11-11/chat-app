@@ -11,7 +11,7 @@ import GroupCreateModal from '../../src/components/GroupCreateModal';
 import ChannelCreateModal from '../../src/components/ChannelCreateModal';
 import { channelApi } from '../../src/services/api/channel';
 import { userApi } from '../../src/services/api/user';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { Avatar } from '../../src/components/Avatar';
 
 export default function CommunityDetailScreen() {
@@ -40,7 +40,6 @@ export default function CommunityDetailScreen() {
   const [memberQuery, setMemberQuery] = useState('');
   const [memberResults, setMemberResults] = useState<any[]>([]);
   const [memberSearching, setMemberSearching] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
 
   const normalizeId = (value: any) => (typeof value === 'string' ? value : value?._id || '');
   const hasId = (list: any[] | undefined, id: string | undefined) => {
@@ -78,13 +77,8 @@ export default function CommunityDetailScreen() {
     headerTopRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
+      justifyContent: 'flex-start',
       marginBottom: 12,
-    },
-    headerActions: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
     },
     headerActionBtn: {
       padding: 8,
@@ -302,33 +296,26 @@ export default function CommunityDetailScreen() {
     modalActionTextPrimary: {
       color: colors.primaryForeground,
     },
-    menuCard: {
-      position: 'absolute',
-      top: 60,
-      right: 16,
-      backgroundColor: colors.card,
+    actionIconRow: {
+      flexDirection: 'row',
+      gap: 12,
+      marginTop: 16,
+      paddingHorizontal: 16,
+    },
+    actionIconBtn: {
+      flex: 1,
+      paddingVertical: 12,
       borderRadius: 12,
+      alignItems: 'center',
       borderWidth: 1,
       borderColor: colors.border,
-      paddingVertical: 8,
-      width: 220,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.15,
-      shadowRadius: 10,
-      elevation: 4,
+      backgroundColor: colors.background,
     },
-    menuItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 10,
-      paddingHorizontal: 12,
-      gap: 8,
-    },
-    menuItemText: {
-      color: colors.foreground,
-      fontSize: 14,
+    actionIconLabel: {
+      fontSize: 13,
       fontWeight: '600',
+      color: colors.foreground,
+      marginTop: 4,
     },
   });
 
@@ -766,52 +753,7 @@ export default function CommunityDetailScreen() {
           <TouchableOpacity style={styles.headerActionBtn} onPress={() => router.back()}>
             <Ionicons name="chevron-back" size={22} color={colors.primary} />
           </TouchableOpacity>
-          <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.headerActionBtn} onPress={() => setCreateGroupOpen(true)}>
-              <MaterialIcons name="group-add" size={20} color={colors.primary} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.headerActionBtn} onPress={() => setCreateChannelOpen(true)}>
-              <MaterialIcons name="add-comment" size={20} color={colors.primary} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.headerActionBtn} onPress={() => setMenuOpen((v) => !v)}>
-              <MaterialIcons name="more-vert" size={20} color={colors.primary} />
-            </TouchableOpacity>
-          </View>
         </View>
-        {menuOpen && (
-          <View style={styles.menuCard}>
-            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuOpen(false); }}>
-              <Ionicons name="information-circle-outline" size={18} color={colors.foreground} />
-              <Text style={styles.menuItemText}>Community info</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuOpen(false); setActiveSection('members'); }}>
-              <Ionicons name="people-outline" size={18} color={colors.foreground} />
-              <Text style={styles.menuItemText}>View members</Text>
-            </TouchableOpacity>
-            {isMember && !isAdmin && (
-              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuOpen(false); handleLeave(); }}>
-                <Ionicons name="exit-outline" size={18} color={colors.accent} />
-                <Text style={[styles.menuItemText, { color: colors.accent }]}>Exit community</Text>
-              </TouchableOpacity>
-            )}
-            {isAdmin && (
-              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuOpen(false); openSettings(); }}>
-                <Ionicons name="settings-outline" size={18} color={colors.foreground} />
-                <Text style={styles.menuItemText}>Settings</Text>
-              </TouchableOpacity>
-            )}
-            {isAdmin && (
-              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuOpen(false); handleDelete(); }}>
-                <Ionicons name="trash-outline" size={18} color={colors.accent} />
-                <Text style={[styles.menuItemText, { color: colors.accent }]}>Delete</Text>
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuOpen(false); shareInviteLink(); }}>
-              <Ionicons name="share-outline" size={18} color={colors.foreground} />
-              <Text style={styles.menuItemText}>Share</Text>
-            </TouchableOpacity>
-          </View>
-        )}
 
         <View style={styles.communityHeader}>
           <View style={{ marginRight: 16 }}>

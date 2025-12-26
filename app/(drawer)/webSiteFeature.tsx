@@ -129,7 +129,7 @@ export default function WebsiteFeaturesScreen() {
       >
         <Text style={[styles.tipText, { color: colors.primary }]}>
           You can extend this page any time with screenshots, demo videos, pricing, or a
-          public roadmap to showcase what's new and what is coming next.
+          public roadmap to showcase what is new and what is coming next.
         </Text>
       </View>
     </ScrollView>

@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState, useMemo } from 'react';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, ScrollView, Modal, Alert } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import "../../global.css";
 import { useAuthStore } from '../../src/store/authStore';
 import { useChatStore } from '../../src/store/chatStore';
@@ -13,7 +13,7 @@ import type { Message } from '../../src/types/chat.types';
 import * as ImagePicker from 'expo-image-picker'
 import * as DocumentPicker from 'expo-document-picker'
 import * as FileSystem from 'expo-file-system/legacy'
-import { Video } from 'expo-av'
+import { Video, ResizeMode } from 'expo-av'
 import { userApi } from '../../src/services/api/user';
 import { Ionicons } from '@expo/vector-icons';
 import { SmartImage } from '../../src/components/SmartImage';
@@ -55,6 +55,7 @@ export default function ChannelDetailScreen() {
   const [editDescription, setEditDescription] = useState('');
   const [editUsername, setEditUsername] = useState('');
   const [editIcon, setEditIcon] = useState('');
+  const [pendingImage, setPendingImage] = useState<string | null>(null);
   
   // Member search state
   const [memberQuery, setMemberQuery] = useState('');
@@ -220,10 +221,21 @@ export default function ChannelDetailScreen() {
         ? imageBase64 
         : `data:image/jpeg;base64,${imageBase64}`;
 
-      await sendMessage({ chatId: channelId, image: finalImage });
+      setPendingImage(finalImage);
     } catch (e) {
       console.error('Image pick failed:', e);
       Alert.alert('Error', 'Failed to select image');
+    }
+  };
+
+  const handleSendPendingImage = async () => {
+    if (!pendingImage || !channelId) return;
+    try {
+      await sendMessage({ chatId: channelId, image: pendingImage });
+      setPendingImage(null);
+    } catch (error) {
+      console.error('Failed to send image:', error);
+      Alert.alert('Error', 'Failed to send image');
     }
   };
 
@@ -492,7 +504,8 @@ export default function ChannelDetailScreen() {
       padding: 12, 
       borderTopWidth: 0.5, 
       borderTopColor: colors.border, 
-      backgroundColor: colors.card 
+      backgroundColor: colors.card,
+      paddingBottom: insets.bottom || 12
     },
     mediaButton: { 
       padding: 10 
@@ -564,6 +577,51 @@ export default function ChannelDetailScreen() {
     mediaVideo: { 
       width: 200, 
       height: 200 
+    },
+    pendingCard: {
+      marginHorizontal: 12,
+      marginTop: 12,
+      padding: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.card
+    },
+    pendingLabel: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: colors.foreground,
+      marginBottom: 8
+    },
+    pendingPreview: {
+      width: '100%',
+      height: 220,
+      borderRadius: 10,
+      marginBottom: 10
+    },
+    pendingActions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end'
+    },
+    pendingButton: {
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 10
+    },
+    pendingCancel: {
+      backgroundColor: colors.muted
+    },
+    pendingCancelText: {
+      color: colors.foreground,
+      fontWeight: '600'
+    },
+    pendingSend: {
+      backgroundColor: colors.primary,
+      marginLeft: 8
+    },
+    pendingSendText: {
+      color: colors.primaryForeground,
+      fontWeight: '700'
     },
     mediaIndicator: { 
       fontSize: 12, 
@@ -672,7 +730,7 @@ export default function ChannelDetailScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -694,7 +752,7 @@ export default function ChannelDetailScreen() {
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => router.push({ pathname: '/(tab)/index', params: { discover: '1' } })}
+            onPress={() => router.push('/')}
           >
             <Ionicons name="search" size={24} color={colors.foreground} />
           </TouchableOpacity>
@@ -758,6 +816,21 @@ export default function ChannelDetailScreen() {
               behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
               keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
             >
+              {pendingImage && (
+                <View style={styles.pendingCard}>
+                  <Text style={styles.pendingLabel}>Ready to send</Text>
+                  <SmartImage source={{ uri: pendingImage }} style={styles.pendingPreview} contentFit="cover" />
+                  <View style={styles.pendingActions}>
+                    <TouchableOpacity style={[styles.pendingButton, styles.pendingCancel]} onPress={() => setPendingImage(null)}>
+                      <Text style={styles.pendingCancelText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.pendingButton, styles.pendingSend]} onPress={handleSendPendingImage} disabled={isSendingMessage}>
+                      <Text style={styles.pendingSendText}>{isSendingMessage ? 'Sending...' : 'Send image'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
               <View style={styles.inputContainer}>
                 <TouchableOpacity style={styles.mediaButton} onPress={handlePickImage} disabled={isSendingMessage}>
                   <Ionicons name="image-outline" size={24} color={colors.primary} />
@@ -1004,6 +1077,6 @@ export default function ChannelDetailScreen() {
           </View>
         </Modal>
       )}
-    </View>
+    </SafeAreaView>
   );
 }

@@ -18,14 +18,14 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
-import { Video } from 'expo-av'
+import { Video, ResizeMode } from 'expo-av'
 
 const MAX_VIDEO_SIZE = 50 * 1024 * 1024;
 
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const { chatId } = useLocalSearchParams<{ chatId: string }>();
-  const { currentChat, messages, fetchChat, sendMessage, addNewMessage, removeMessage, isSendingMessage, markAsRead } = useChatStore();
+  const { currentChat, messages, fetchChat, sendMessage, addNewMessage, removeMessage, isSendingMessage, markAsRead ,fetchChats,clearCurrentChat} = useChatStore();
   const { user } = useAuthStore();
   const { onlineUsers } = useSocketStore();
   const { socket } = useSocket({});
@@ -36,6 +36,7 @@ export default function ChatScreen() {
   const typingTimeoutRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const colors = useThemeColors();
+  const [pendingImage, setPendingImage] = useState<string | null>(null);
   const [isPreviewVisible, setIsPreviewVisible] = useState(false);
   const [previewMedia, setPreviewMedia] = useState<{ 
     type: 'image' | 'video'; 
@@ -48,6 +49,16 @@ export default function ChatScreen() {
     height?: number; 
   } | null>(null);
   const [isProcessingMedia, setIsProcessingMedia] = useState(false);
+  const flatListRef = useRef<FlatList>(null);
+  useEffect(() => {
+  return () => {
+    clearCurrentChat();
+    setTypingUsers([]);
+    setPendingImage(null);
+    setPreviewMedia(null);
+    setIsPreviewVisible(false);
+  };
+}, [chatId]);
 
   const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background, paddingTop: insets.top },
@@ -134,6 +145,51 @@ export default function ChatScreen() {
       borderRadius: 10,
       overflow: 'hidden',
     },
+    pendingCard: {
+      marginHorizontal: 12,
+      marginTop: 12,
+      padding: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.card
+    },
+    pendingLabel: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: colors.foreground,
+      marginBottom: 8
+    },
+    pendingPreview: {
+      width: '100%',
+      height: 220,
+      borderRadius: 10,
+      marginBottom: 10
+    },
+    pendingActions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end'
+    },
+    pendingButton: {
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 10
+    },
+    pendingCancel: {
+      backgroundColor: colors.muted
+    },
+    pendingCancelText: {
+      color: colors.foreground,
+      fontWeight: '600'
+    },
+    pendingSend: {
+      backgroundColor: colors.primary,
+      marginLeft: 8
+    },
+    pendingSendText: {
+      color: colors.primaryForeground,
+      fontWeight: '700'
+    },
   });
 
   useEffect(() => {
@@ -142,6 +198,14 @@ export default function ChatScreen() {
       markAsRead(chatId);
     }
   }, [chatId]);
+
+  useEffect(() => {
+    if (messages.length > 0 && flatListRef.current) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: false });
+      }, 100);
+    }
+  }, [messages]);
 
   useEffect(() => {
     if (!socket || !chatId) return;
@@ -216,26 +280,7 @@ export default function ChatScreen() {
     }
   };
 
-  const handleLeaveGroup = async () => {
-    if (!currentChat) return;
-    Alert.alert('Leave Group', `Are you sure you want to leave ${currentChat.groupName}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { 
-        text: 'Leave', 
-        style: 'destructive', 
-        onPress: async () => { 
-          try { 
-            await chatApi.removeMember(currentChat._id, user?._id as string); 
-            fetchChats(); 
-            router.replace('/(tab)'); 
-          } catch (err: any) { 
-            Alert.alert('Error', err.response?.data?.message || 'Failed to leave group'); 
-          }
-        } 
-      }
-    ]);
-  };
-
+  
   const handleDeleteChat = async () => {
      if (!currentChat) return;
      Alert.alert('Delete Chat', 'Permanently delete this conversation?', [
@@ -268,19 +313,42 @@ export default function ChatScreen() {
         return;
       }
 
-      setPreviewMedia({
-        type: 'image',
-        uri: asset.uri,
-        base64: asset.base64,
-        width: asset.width,
-        height: asset.height
-      });
-      setIsPreviewVisible(true);
+      let imageBase64 = asset.base64;
+      if (!imageBase64 && asset.uri) {
+        try {
+          imageBase64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: 'base64' });
+        } catch (readError) {
+          console.error('Failed to read image as base64:', readError);
+        }
+      }
+
+      if (!imageBase64) {
+        Alert.alert('Error', 'Failed to process image');
+        return;
+      }
+
+      const finalImage = imageBase64.startsWith('data:')
+        ? imageBase64
+        : `data:image/jpeg;base64,${imageBase64}`;
+
+      setPendingImage(finalImage);
     } catch (e) {
       console.error('Image pick failed:', e);
       Alert.alert('Error', 'Failed to select image');
     }
   };
+
+  const handleSendPendingImage = async () => {
+    if (!pendingImage || !chatId) return;
+    try {
+      await sendMessage({ chatId, image: pendingImage });
+      setPendingImage(null);
+    } catch (error) {
+      console.error('Failed to send image:', error);
+      Alert.alert('Error', 'Failed to send image');
+    }
+  };
+  
 
   const handlePickVideo = async () => {
     try {
@@ -317,26 +385,26 @@ export default function ChatScreen() {
       if (previewMedia.type === 'image') {
         let imageBase64 = previewMedia.base64;
         if (!imageBase64 && previewMedia.uri) {
-           try {
-             imageBase64 = await FileSystem.readAsStringAsync(previewMedia.uri, { encoding: 'base64' });
-           } catch (readError) {
-             console.error('Failed to read image as base64:', readError);
-           }
+          try {
+            imageBase64 = await FileSystem.readAsStringAsync(previewMedia.uri, { encoding: 'base64' });
+          } catch (readError) {
+            console.error('Failed to read image as base64:', readError);
+          }
         }
-        
+
         if (!imageBase64) {
           Alert.alert('Error', 'Failed to process image');
           return;
         }
 
-        const finalImage = imageBase64.startsWith('data:') 
-          ? imageBase64 
+        const finalImage = imageBase64.startsWith('data:')
+          ? imageBase64
           : `data:image/jpeg;base64,${imageBase64}`;
 
-        await sendMessage({ 
-            chatId, 
-            image: finalImage,
-            content: caption.trim() || undefined 
+        await sendMessage({
+          chatId,
+          image: finalImage,
+          content: caption.trim() || undefined,
         });
       } else {
         // Video
@@ -387,7 +455,12 @@ export default function ChatScreen() {
 
     const isMyMessage = item.sender?._id === user?._id;
     const imageSrc = item.image
-      ? (item.image.startsWith('http') ? { uri: item.image } : { uri: `data:image/jpeg;base64,${item.image}` })
+      ? {
+          uri:
+            item.image.startsWith('http') || item.image.startsWith('data:')
+              ? item.image
+              : `data:image/jpeg;base64,${item.image}`,
+        }
       : null;
     const videoUri = item.video?.url || null;
     
@@ -416,7 +489,7 @@ export default function ChatScreen() {
               <Video
                 source={{ uri: videoUri }}
                 style={styles.mediaVideo}
-                resizeMode={Platform.OS === 'web' ? 'contain' : 'cover'}
+                resizeMode={Platform.OS === 'web' ? ResizeMode.CONTAIN : ResizeMode.COVER}
                 useNativeControls
                 shouldPlay={false}
                 isLooping={false}
@@ -508,6 +581,7 @@ export default function ChatScreen() {
       </View>
       
       <FlatList
+        ref={flatListRef}
         data={messages}
         keyExtractor={(item) => item._id}
         renderItem={renderMessage}
@@ -517,14 +591,42 @@ export default function ChatScreen() {
         keyboardShouldPersistTaps="handled"
         scrollEnabled={true}
         ListFooterComponent={
-          typingUsers.length > 0 ? (
-            <View style={styles.typingIndicator}>
-              <View style={styles.typingDot} />
-              <View style={styles.typingDot} />
-              <View style={styles.typingDot} />
-              <Text style={styles.typingText}>{getTypingText()}</Text>
-            </View>
-          ) : null
+          <>
+            {pendingImage && (
+              <View style={styles.pendingCard}>
+                <Text style={styles.pendingLabel}>Sending Image...</Text>
+                <SmartImage 
+                  source={pendingImage}
+                  containerStyle={styles.pendingPreview}
+                  contentFit="cover"
+                  showLoadingIndicator={true}
+                />
+                <View style={styles.pendingActions}>
+                  <TouchableOpacity 
+                    style={[styles.pendingButton, styles.pendingCancel]}
+                    onPress={() => setPendingImage(null)}
+                  >
+                    <Text style={styles.pendingCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.pendingButton, styles.pendingSend]}
+                    onPress={handleSendPendingImage}
+                    disabled={isSendingMessage}
+                  >
+                    <Text style={styles.pendingSendText}>Send</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+            {typingUsers.length > 0 ? (
+              <View style={styles.typingIndicator}>
+                <View style={styles.typingDot} />
+                <View style={styles.typingDot} />
+                <View style={styles.typingDot} />
+                <Text style={styles.typingText}>{getTypingText()}</Text>
+              </View>
+            ) : null}
+          </>
         }
       />
       
