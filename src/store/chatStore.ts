@@ -172,12 +172,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
       console.error('Failed to mark as read:', error);
     }
   },
-  
   clearCurrentChat: () => {
-    set({
-      currentChat: null,
-      messages: [],
-    });
-  },
+  set({
+    currentChat: null,
+    messages: [],
+    isMessagesLoading: false,
+    isSendingMessage: false,
+  });
+},
 }));
 

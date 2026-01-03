@@ -3,8 +3,7 @@ module.exports = function (api) {
   return {
     presets: ["babel-preset-expo", "nativewind/babel"],
     plugins: [
-      // Enables Expo Router transforms, including typed routes
-      "expo-router/babel",
+      // Add other plugins here if needed
     ],
   };
 };

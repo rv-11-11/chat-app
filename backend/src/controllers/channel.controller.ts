@@ -92,7 +92,8 @@ export const subscribeToChannelController = asyncHandler(
 export const unsubscribeFromChannelController = asyncHandler(
   async (req: Request, res: Response) => {
     // If userId is in body, use it (admin removing subscriber), otherwise use logged-in user
-    const userId = req.body.userId || req.user?._id;
+    const body = (req.body || {}) as { userId?: string };
+    const userId = body.userId || req.user?._id;
     const { channelId } = req.params;
 
     const channel = await unsubscribeFromChannelService(channelId, userId);

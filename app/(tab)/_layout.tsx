@@ -11,46 +11,27 @@ const TabRoot =() => {
             <Tabs.Screen 
                 name="index"
                 options={{
-                    title: "Home",
+                    headerTitle: () => null,
                     headerLeft: () => <DrawerToggle />,
+                    headerRight: () => null,
                     tabBarIcon: ({ color }) => (
                         <FontAwesome name="home" size={24} color={color} />
                     ),
                 }}
             />
-
-            <Tabs.Screen 
-                name="discover"
-                options={{
-                    title: "Discover",
-                    headerShown: false,
-                    tabBarIcon: ({ color }) => (
-                        <FontAwesome name="compass" size={24} color={color} />
-                    ),
-                }}
-            />
-            
             <Tabs.Screen 
                 name="chat"
                 options={{
                     title: "Chats",
                     headerShown: false,
                     tabBarIcon: ({ color }) => (
-                        <FontAwesome name="commenting" size={24} color={color} />
+                        <FontAwesome name="comment" size={24} color={color} />
+                        
                     ),
                 }}
             />
 
-            <Tabs.Screen 
-                name="community"
-                options={{
-                    title: "Community",
-                    headerShown: false,
-                    tabBarIcon: ({ color }) => (
-                        <FontAwesome name="users" size={24} color={color} />
-                    ),
-                }}
-            />
+            
 
             <Tabs.Screen 
                 name="group"
@@ -58,7 +39,7 @@ const TabRoot =() => {
                     title: "Groups",
                     headerShown: false,
                     tabBarIcon: ({ color }) => (
-                        <FontAwesome name="object-group" size={24} color={color} />
+                        <FontAwesome name="group" size={24} color={color} />
                     ),
                 }}
             />
@@ -69,7 +50,17 @@ const TabRoot =() => {
                     title: "Channels",
                     headerShown: false,
                     tabBarIcon: ({ color }) => (
-                        <FontAwesome name="rss" size={24} color={color} />
+                        <FontAwesome name="bullhorn" size={24} color={color} />
+                    ),
+                }}
+            />
+            <Tabs.Screen 
+                name="community"
+                options={{
+                    title: "Community",
+                    headerShown: false,
+                    tabBarIcon: ({ color }) => (
+                        <FontAwesome name="globe" size={24} color={color} />
                     ),
                 }}
             />
