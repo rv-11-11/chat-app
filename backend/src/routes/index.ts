@@ -5,6 +5,7 @@ import userRoutes from "./user.route";
 import channelRoutes from "./channel.route";
 import communityRoutes from "./community.route";
 import adminRoutes from "./admin.route";
+import inviteRoutes from "./invite.route";
 import { HTTPSTATUS } from "../config/http.config";
 
 const router = Router();
@@ -15,6 +16,7 @@ router.use("/users", userRoutes);
 router.use("/channel", channelRoutes);
 router.use("/community", communityRoutes);
 router.use("/admin", adminRoutes);
+router.use("/invite", inviteRoutes);
 
 router.get("/version", (req, res) => {
   res.status(HTTPSTATUS.OK).json({

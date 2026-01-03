@@ -19,6 +19,8 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Video, ResizeMode } from 'expo-av'
+import InviteUserDialog from '../../src/components/InviteUserDialog';
+import { InviteType } from '../../src/services/api/invite';
 
 const MAX_VIDEO_SIZE = 50 * 1024 * 1024;
 
@@ -32,6 +34,7 @@ export default function ChatScreen() {
   const router = useRouter();
   const [messageText, setMessageText] = useState('');
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const typingTimeoutRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -622,8 +625,16 @@ export default function ChatScreen() {
         </View>
         <TouchableOpacity 
           onPress={() => {
-            if (currentChat?.isGroup) {
-              setIsGroupModalOpen(true);
+            if (currentChat?.isGroup || currentChat?.type === 'GROUP' || currentChat?.type === 'CHANNEL') {
+              Alert.alert(
+                currentChat?.type === 'CHANNEL' ? 'Channel Options' : 'Group Options',
+                undefined,
+                [
+                  { text: 'Invite Members', onPress: () => setIsInviteModalOpen(true) },
+                  { text: currentChat?.type === 'CHANNEL' ? 'Channel Details' : 'Group Details', onPress: () => setIsGroupModalOpen(true) },
+                  { text: 'Cancel', style: 'cancel' }
+                ]
+              );
             } else {
               Alert.alert('Options', undefined, [
                 { text: 'Delete Chat', style: 'destructive', onPress: handleDeleteChat },
@@ -698,6 +709,14 @@ export default function ChatScreen() {
         onSend={handleSendMedia}
         media={previewMedia}
         isSending={isSendingMessage}
+      />
+      
+      <InviteUserDialog
+        visible={isInviteModalOpen}
+        onClose={() => setIsInviteModalOpen(false)}
+        targetId={currentChat?._id || ''}
+        targetType={currentChat?.type === 'CHANNEL' ? 'CHANNEL' : 'GROUP'}
+        targetName={getChatName() || 'Chat'}
       />
     </KeyboardAvoidingView>
   );

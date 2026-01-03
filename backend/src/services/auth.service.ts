@@ -5,6 +5,7 @@ import {
   RegisterSchemaType,
   GoogleLoginSchemaType,
 } from "../validators/auth.validator";
+import { claimInvitesByEmailService } from "./invite.service";
 
 export const registerService = async (body: RegisterSchemaType) => {
   const { email } = body;
@@ -17,6 +18,10 @@ export const registerService = async (body: RegisterSchemaType) => {
     avatar: body.avatar,
   });
   await newUser.save();
+  
+  // Claim any pending invites
+  await claimInvitesByEmailService(newUser.email!, newUser._id as string);
+  
   return newUser;
 };
 
@@ -45,6 +50,9 @@ export const googleLoginService = async (body: GoogleLoginSchemaType) => {
       avatar,
     });
     await user.save();
+    
+    // Claim any pending invites
+    await claimInvitesByEmailService(user.email!, user._id as string);
   }
   
   return user;
