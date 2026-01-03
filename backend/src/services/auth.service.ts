@@ -3,6 +3,7 @@ import { NotFoundException, UnauthorizedException } from "../services/utils/app-
 import {
   LoginSchemaType,
   RegisterSchemaType,
+  GoogleLoginSchemaType,
 } from "../validators/auth.validator";
 
 export const registerService = async (body: RegisterSchemaType) => {
@@ -29,5 +30,22 @@ export const loginService = async (body: LoginSchemaType) => {
   if (!isPasswordValid)
     throw new UnauthorizedException("Invaild email or password");
 
+  return user;
+};
+
+export const googleLoginService = async (body: GoogleLoginSchemaType) => {
+  const { email, name, googleId, avatar } = body;
+  let user = await UserModel.findOne({ email });
+  
+  if (!user) {
+    user = new UserModel({
+      name,
+      email,
+      password: googleId, // Use googleId as password (hashed by pre-save)
+      avatar,
+    });
+    await user.save();
+  }
+  
   return user;
 };

@@ -27,6 +27,13 @@ export interface LoginData {
   password: string;
 }
 
+export interface GoogleLoginData {
+  email: string;
+  name: string;
+  googleId: string;
+  avatar?: string;
+}
+
 export interface AuthResponse {
   message: string;
   user: User;

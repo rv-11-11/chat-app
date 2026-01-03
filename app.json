@@ -1,18 +1,20 @@
 {
   "expo": {
-    "name": "ChatApp",
-    "slug": "ChatApp",
+    "name": "LinkiPlay - Telegram Style Messenger",
+    "slug": "linkiplay",
+    "description": "LinkiPlay connects your communities, channels, and groups with rich messaging.",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "chatapp",
+    "icon": "./assets/images/logo.png",
+    "scheme": "linkiplay",
     "userInterfaceStyle": "automatic",
+    "backgroundColor": "#ffffff",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
     },
     "android": {
-      "package": "com.chatapp.mobile",
+      "package": "com.linkiplay.messenger",
       "versionCode": 1,
       "permissions": [
         "INTERNET",
@@ -21,24 +23,31 @@
       ],
       "enableProguardInReleaseBuilds": true,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#3b82f6",
+        "foregroundImage": "./assets/images/logo.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/logo.png",
+      "name": "LinkiPlay",
+      "shortName": "LinkiPlay",
+      "description": "LinkiPlay connects your communities, channels, and groups with rich messaging.",
+      "startUrl": "/",
+      "scope": "/",
+      "display": "standalone",
+      "backgroundColor": "#ffffff",
+      "themeColor": "#3b82f6",
+      "orientation": "portrait-primary"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/logo.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
@@ -54,7 +63,10 @@
     },
     "extra": {
       "apiUrl": "http://localhost:8000",
-      "socketUrl": "http://localhost:8000"
+      "socketUrl": "http://localhost:8000",
+      "googleWebClientId": "170631155124-jt38kvf290u2pa6dht834bmblv527tsq.apps.googleusercontent.com",
+      "googleIosClientId": "YOUR_IOS_CLIENT_ID.apps.googleusercontent.com",
+      "googleAndroidClientId": "170631155124-38er02pg8ve6ar9ts6h2u0udhk3hgek3.apps.googleusercontent.com"
     }
   }
 }

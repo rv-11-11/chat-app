@@ -4,10 +4,11 @@ import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, Text, T
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import "../../global.css";
 import CommunityCreateModal from '../../src/components/CommunityCreateModal';
+import CommunityMenuModal from '../../src/components/CommunityMenuModal';
 import { useAuthStore } from '../../src/store/authStore';
 import { useCommunityStore } from '../../src/store/communityStore';
 import type { CommunityType } from '../../src/types/community.type';
-import { useThemeColors } from '../../src/utils/theme';
+import { useThemeColors, useAppTheme } from '../../src/utils/theme';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { Avatar } from '../../src/components/Avatar';
 
@@ -16,7 +17,7 @@ const Community = () => {
   const { communities, publicCommunities, fetchUserCommunities, fetchPublicCommunities, isCommunitiesLoading, leaveCommunity, deleteCommunity, joinCommunity } = useCommunityStore();
   const { isCreateOpen, setIsCreateOpen } = useCommunityStore();
   const { user } = useAuthStore();
-  const colors = useThemeColors();
+  const { colors, spacing, typography, radius, shadows } = useAppTheme();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'my' | 'public'>('my');
   const [refreshing, setRefreshing] = useState(false);
@@ -37,65 +38,56 @@ const Community = () => {
       flexDirection: 'row', 
       justifyContent: 'space-between', 
       alignItems: 'center', 
-      paddingHorizontal: 20, 
-      paddingVertical: 16, 
+      paddingHorizontal: spacing.xl, 
+      paddingVertical: spacing.lg, 
       borderBottomWidth: 0.5, 
       borderBottomColor: colors.border, 
       backgroundColor: colors.card, 
-      shadowColor: '#000', 
-      shadowOffset: { width: 0, height: 2 }, 
-      shadowOpacity: 0.06, 
-      shadowRadius: 8, 
-      elevation: 3 
+      ...shadows.sm
     },
     headerTitle: { 
-      fontSize: 32, 
-      fontWeight: '800', 
+      ...typography.h2,
       color: colors.foreground, 
       letterSpacing: -0.5 
     },
     newButton: { 
       backgroundColor: colors.primary, 
-      paddingHorizontal: 16, 
-      paddingVertical: 10, 
-      borderRadius: 10, 
-      shadowColor: colors.primary, 
-      shadowOffset: { width: 0, height: 2 }, 
-      shadowOpacity: 0.25, 
-      shadowRadius: 5, 
-      elevation: 3 
+      paddingHorizontal: spacing.lg, 
+      paddingVertical: spacing.sm + 2, 
+      borderRadius: radius.md, 
+      ...shadows.md
     },
     newButtonText: { 
+      ...typography.bodySemibold,
       color: colors.primaryForeground, 
-      fontWeight: '700', 
       fontSize: 14 
     },
     tabs: {
       flexDirection: 'row',
       backgroundColor: colors.card,
-      paddingHorizontal: 18,
-      paddingVertical: 12,
-      gap: 12,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+      gap: spacing.md,
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
     },
     tab: {
       flex: 1,
-      paddingVertical: 12,
-      borderRadius: 10,
+      paddingVertical: spacing.md,
+      borderRadius: radius.md,
       alignItems: 'center',
       backgroundColor: colors.background,
       borderWidth: 1.5,
       borderColor: colors.border,
-      marginHorizontal: 6,
+      marginHorizontal: spacing.xs,
     },
     tabActive: {
       backgroundColor: colors.primary,
       borderColor: colors.primary,
     },
     tabText: {
+      ...typography.bodySemibold,
       fontSize: 14,
-      fontWeight: '600',
       color: colors.mutedForeground,
     },
     tabTextActive: {
@@ -104,20 +96,16 @@ const Community = () => {
     },
     item: { 
       flexDirection: 'row', 
-      paddingHorizontal: 16, 
-      paddingVertical: 14, 
+      paddingHorizontal: spacing.lg, 
+      paddingVertical: spacing.lg - 2, 
       alignItems: 'center', 
-      marginHorizontal: 16, 
-      marginVertical: 6, 
-      borderRadius: 12, 
+      marginHorizontal: spacing.lg, 
+      marginVertical: spacing.xs, 
+      borderRadius: radius.lg, 
       backgroundColor: colors.card, 
       borderWidth: 0.8, 
       borderColor: colors.border, 
-      shadowColor: '#000', 
-      shadowOffset: { width: 0, height: 1 }, 
-      shadowOpacity: 0.05, 
-      shadowRadius: 3, 
-      elevation: 2 
+      ...shadows.sm
     },
     leftArea: {
       flex: 1,
@@ -131,7 +119,7 @@ const Community = () => {
       backgroundColor: colors.primary, 
       justifyContent: 'center', 
       alignItems: 'center', 
-      marginRight: 14 
+      marginRight: spacing.lg - 2 
     },
     avatarText: { 
       color: colors.primaryForeground, 
@@ -140,20 +128,22 @@ const Community = () => {
     },
     info: { 
       flex: 1,
-      gap: 4,
+      gap: spacing.xs,
     },
     title: { 
+      ...typography.bodySemibold,
       fontSize: 16, 
-      fontWeight: '700', 
       color: colors.foreground, 
       letterSpacing: -0.2 
     },
     subtitle: { 
+      ...typography.caption,
       fontSize: 12, 
       color: colors.mutedForeground, 
       fontWeight: '500' 
     },
     badge: {
+      ...typography.caption,
       fontSize: 10,
       color: colors.primary,
       fontWeight: '600',
@@ -163,31 +153,26 @@ const Community = () => {
       flex: 1, 
       justifyContent: 'center', 
       alignItems: 'center',
-      paddingHorizontal: 24,
-      paddingVertical: 40,
+      paddingHorizontal: spacing.xl,
+      paddingVertical: spacing.xxl,
     },
     emptyText: {
+      ...typography.body,
       color: colors.mutedForeground,
-      fontSize: 16,
       textAlign: 'center',
       fontWeight: '500',
-      lineHeight: 24,
     },
     menuBtn: { 
-      padding: 8,
-      marginLeft: 8,
+      padding: spacing.sm,
+      marginLeft: spacing.sm,
     },
     actionBtn: {
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      borderRadius: 8,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderRadius: radius.sm,
       backgroundColor: colors.primary,
-      marginLeft: 8,
-      shadowColor: colors.primary,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.2,
-      shadowRadius: 4,
-      elevation: 2,
+      marginLeft: spacing.sm,
+      ...shadows.sm
     },
     actionBtnText: {
       color: colors.primaryForeground,
@@ -238,6 +223,7 @@ const Community = () => {
   const [menuCommunity, setMenuCommunity] = useState<CommunityType | null>(null);
 
   // helper to find the latest community object from stores (user communities or public list)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const getFreshCommunity = (id: string) => {
     const fromMy = (communities || []).find((c: CommunityType) => String(c._id) === String(id));
     if (fromMy) return fromMy;
@@ -330,7 +316,7 @@ const Community = () => {
       <Animated.View style={[styles.item, { opacity: animatedOpacity, transform: [{ translateY: animatedTranslateY }] }] }>
         {/* Left area is pressable to navigate into the community */}
         <TouchableOpacity style={styles.leftArea} onPress={() => handleCommunityPress(item)} activeOpacity={0.85}>
-          <View style={{ marginRight: 14 }}>
+          <View style={{ marginRight: spacing.md }}>
             <Avatar
               uri={item.icon}
               name={item.name}
@@ -345,7 +331,13 @@ const Community = () => {
             </Text>
             {isAdmin && <Text style={styles.badge}>👑 Admin</Text>}
             {!isAdmin && isMember && <Text style={styles.badge}>✓ Member</Text>}
-            {item.isPublic && <Text style={styles.badge}>🌐 Public</Text>}
+            {item.description ? (
+              <Text style={[styles.subtitle, { marginTop: 4 }]} numberOfLines={1}>
+                {item.description}
+              </Text>
+            ) : (
+              item.isPublic && <Text style={styles.badge}>🌐 Public</Text>
+            )}
           </View>
         </TouchableOpacity>
 
@@ -394,7 +386,7 @@ const Community = () => {
         </View>
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={{ marginTop: 12, color: colors.mutedForeground }}>Loading communities...</Text>
+          <Text style={{ marginTop: spacing.md, color: colors.mutedForeground }}>Loading communities...</Text>
         </View>
       </View>
     );
@@ -441,8 +433,8 @@ const Community = () => {
       {menuCommunity && (
         <Modal transparent animationType="fade" visible={true} onRequestClose={() => setMenuCommunity(null)}>
           <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' }}>
-            <View style={{ width: 320, backgroundColor: colors.card, borderRadius: 12, padding: 16 }}>
-              <Text style={{ fontSize: 18, fontWeight: '700', color: colors.foreground, marginBottom: 12 }}>{menuCommunity.name}</Text>
+            <View style={{ width: 320, backgroundColor: colors.card, borderRadius: radius.lg, padding: spacing.lg }}>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: colors.foreground, marginBottom: spacing.md }}>{menuCommunity.name}</Text>
               {/* Determine role using fresh data from stores */}
               {(() => {
                 const fresh = menuCommunity ? getFreshCommunity(String(menuCommunity._id)) : null;
@@ -465,7 +457,7 @@ const Community = () => {
                       </TouchableOpacity>
                     )}
                     {isAdmin && (
-                      <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#ff4444' }]} onPress={() => target && handleDelete(target)}>
+                      <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.destructive }]} onPress={() => target && handleDelete(target)}>
                         <Text style={styles.actionBtnText}>Delete Group</Text>
                       </TouchableOpacity>
                     )}
@@ -473,7 +465,7 @@ const Community = () => {
                 );
               })()}
 
-              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.background, marginTop: 8 }]} onPress={() => setMenuCommunity(null)}>
+              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.background, marginTop: spacing.sm }]} onPress={() => setMenuCommunity(null)}>
                 <Text style={[styles.actionBtnText, { color: colors.foreground }]}>Cancel</Text>
               </TouchableOpacity>
             </View>
@@ -494,7 +486,7 @@ const Community = () => {
         }
         ListEmptyComponent={
           <View style={styles.center}>
-            <Text style={{ fontSize: 48, marginBottom: 16 }}>
+            <Text style={{ fontSize: 48, marginBottom: spacing.lg }}>
               {activeTab === 'my' ? '🏘️' : '🌍'}
             </Text>
             <Text style={styles.emptyText}>
@@ -502,7 +494,7 @@ const Community = () => {
                 ? 'No communities yet' 
                 : 'No public communities found'}
             </Text>
-            <Text style={[styles.emptyText, { fontSize: 14, marginTop: 8 }]}>
+            <Text style={[styles.emptyText, { fontSize: 14, marginTop: spacing.sm }]}>
               {activeTab === 'my'
                 ? 'Create one to get started!'
                 : 'Check back later for new communities.'}

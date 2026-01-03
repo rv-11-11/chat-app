@@ -51,7 +51,8 @@ export const SmartImage: React.FC<SmartImageProps> = ({
           setHasError(false);
         }}
         onLoad={() => setIsLoading(false)}
-        onError={() => {
+        onError={(e) => {
+          console.log('SmartImage error:', e.error);
           setIsLoading(false);
           setHasError(true);
         }}

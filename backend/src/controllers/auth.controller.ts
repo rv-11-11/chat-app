@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
 import { HTTPSTATUS } from "../config/http.config";
 import { asyncHandler } from "../middlewares/asyncHandler.middleware";
-import { loginService, registerService } from "../services/auth.service";
+import { loginService, registerService, googleLoginService } from "../services/auth.service";
 import { clearJwtAuthCookie, setJwtAuthCookie } from "../services/utils/cookie";
-import { loginSchema, registerSchema } from "../validators/auth.validator";
+import { loginSchema, registerSchema, googleLoginSchema } from "../validators/auth.validator";
 
 export const registerController = asyncHandler(
   async (req: Request, res: Response) => {
@@ -31,6 +31,21 @@ export const loginController = asyncHandler(
     const token = setJwtAuthCookie({ res, userId });
     return res.status(HTTPSTATUS.OK).json({
       message: "User login successfully",
+      user,
+      token,
+    });
+  }
+);
+
+export const googleLoginController = asyncHandler(
+  async (req: Request, res: Response) => {
+    const body = googleLoginSchema.parse(req.body);
+
+    const user = await googleLoginService(body);
+    const userId = user._id as string;
+    const token = setJwtAuthCookie({ res, userId });
+    return res.status(HTTPSTATUS.OK).json({
+      message: "Google login successfully",
       user,
       token,
     });

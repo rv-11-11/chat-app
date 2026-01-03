@@ -1,12 +1,13 @@
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { userApi } from '../services/api/user';
 import { useChatStore } from '../store/chatStore';
 import type { User } from '../types/auth.types';
-import { SmartImage } from './SmartImage';
+import { useAppTheme } from '../utils/theme';
 import { Avatar } from './Avatar';
+import { SmartImage } from './SmartImage';
 
 interface Props {
   visible: boolean;
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export default function GroupCreateModal({ visible, onClose, onCreated }: Props) {
+  const { colors, spacing, radius, typography, shadows } = useAppTheme();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<User[]>([]);
   const [selected, setSelected] = useState<User[]>([]);
@@ -129,19 +131,188 @@ export default function GroupCreateModal({ visible, onClose, onCreated }: Props)
     }
   };
 
+  const styles = StyleSheet.create({
+    overlay: { 
+      flex: 1, 
+      backgroundColor: 'rgba(0,0,0,0.6)', 
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: spacing.lg,
+    },
+    content: { 
+      width: '100%',
+      maxWidth: 500,
+      maxHeight: '90%',
+      backgroundColor: colors.card, 
+      borderRadius: radius.xl, 
+      ...shadows.lg,
+      overflow: 'hidden',
+    },
+    headerRow: { 
+      flexDirection: 'row', 
+      justifyContent: 'space-between', 
+      alignItems: 'center',
+      padding: spacing.lg, 
+      borderBottomWidth: 1, 
+      borderBottomColor: colors.border,
+      backgroundColor: colors.card,
+    },
+    header: { 
+      ...typography.h3,
+      color: colors.foreground
+    },
+    close: { 
+      fontSize: 24, 
+      color: colors.mutedForeground,
+      fontWeight: '300'
+    },
+    form: { 
+      padding: spacing.lg,
+    },
+    input: { 
+      backgroundColor: colors.input, 
+      padding: spacing.md, 
+      paddingHorizontal: spacing.lg,
+      borderRadius: radius.md, 
+      marginBottom: spacing.lg,
+      fontSize: 15,
+      borderWidth: 1,
+      borderColor: colors.border,
+      color: colors.foreground,
+    },
+    sectionTitle: {
+      fontSize: 13, 
+      color: colors.mutedForeground, 
+      marginBottom: spacing.sm, 
+      fontWeight: '600' 
+    },
+    pickerContainer: {
+      borderWidth: 1, 
+      borderColor: colors.border, 
+      borderRadius: radius.md, 
+      overflow: 'hidden', 
+      backgroundColor: colors.input,
+      marginBottom: spacing.lg,
+    },
+    picker: {
+      height: 50,
+      color: colors.foreground,
+    },
+    iconRow: { 
+      flexDirection: 'row', 
+      alignItems: 'center', 
+      marginTop: spacing.xs,
+      marginBottom: spacing.lg,
+      gap: spacing.lg
+    },
+    iconPicker: { 
+      width: 80, 
+      height: 80, 
+      borderRadius: radius.lg, 
+      backgroundColor: colors.muted, 
+      justifyContent: 'center', 
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: colors.border,
+      borderStyle: 'dashed'
+    },
+    iconPickerText: { 
+      color: colors.mutedForeground,
+      fontSize: 13,
+      fontWeight: '600'
+    },
+    iconPreview: { 
+      width: 80, 
+      height: 80, 
+      borderRadius: radius.lg 
+    },
+    toggleButton: { 
+      backgroundColor: colors.primary, 
+      paddingHorizontal: spacing.xl, 
+      paddingVertical: spacing.md, 
+      borderRadius: radius.md,
+      minWidth: 100,
+      alignItems: 'center'
+    },
+    userItem: { 
+      flexDirection: 'row', 
+      alignItems: 'center', 
+      padding: spacing.md, 
+      borderBottomWidth: 1, 
+      borderBottomColor: colors.border,
+      backgroundColor: colors.card,
+    },
+    userName: { 
+      ...typography.bodySemibold,
+      color: colors.foreground
+    },
+    userSub: { 
+      ...typography.caption,
+      color: colors.mutedForeground, 
+      marginTop: 2,
+    },
+    selectedRow: { 
+      flexDirection: 'row', 
+      flexWrap: 'wrap', 
+      marginTop: spacing.xs,
+      marginBottom: spacing.lg,
+      gap: spacing.sm
+    },
+    selectedChip: { 
+      backgroundColor: colors.primary, 
+      paddingHorizontal: spacing.md, 
+      paddingVertical: spacing.xs, 
+      borderRadius: radius.full,
+      ...shadows.sm
+    },
+    resultsContainer: {
+      minHeight: 180, 
+      marginTop: spacing.sm, 
+      borderRadius: radius.lg, 
+      overflow: 'hidden',
+      backgroundColor: colors.input, // or muted
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    createBtn: { 
+      backgroundColor: colors.primary, 
+      padding: spacing.lg, 
+      borderRadius: radius.lg, 
+      alignItems: 'center', 
+      marginTop: spacing.xl,
+      marginBottom: spacing.lg,
+      ...shadows.md
+    },
+    createText: { 
+      color: colors.primaryForeground, 
+      fontWeight: '700',
+      fontSize: 16
+    },
+    loadingContainer: {
+      padding: spacing.xl,
+      alignItems: 'center',
+    },
+    emptyContainer: {
+      padding: spacing.xl,
+      alignItems: 'center',
+    }
+  });
+
   const renderUser = ({ item }: { item: User }) => (
     <TouchableOpacity style={styles.userItem} onPress={() => toggleSelect(item)}>
       <Avatar
         uri={item.avatar}
         name={item.name}
         size={40}
-        style={{ marginRight: 14 }}
+        style={{ marginRight: spacing.md }}
       />
       <View style={{ flex: 1 }}>
         <Text style={styles.userName}>{item.name}</Text>
         {item.username && <Text style={styles.userSub}>@{item.username}</Text>}
       </View>
-      <Text style={{ color: selected.some(s => s._id === item._id) ? '#007AFF' : '#999' }}>{selected.some(s => s._id === item._id) ? 'Selected' : 'Add'}</Text>
+      <Text style={{ color: selected.some(s => s._id === item._id) ? colors.primary : colors.mutedForeground }}>
+        {selected.some(s => s._id === item._id) ? 'Selected' : 'Add'}
+      </Text>
     </TouchableOpacity>
   );
 
@@ -152,20 +323,22 @@ export default function GroupCreateModal({ visible, onClose, onCreated }: Props)
   );
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={styles.content}>
           <View style={styles.headerRow}>
             <Text style={styles.header}>Create Group</Text>
-            <TouchableOpacity onPress={onClose}><Text style={styles.close}>✕</Text></TouchableOpacity>
+            <TouchableOpacity onPress={onClose} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+              <Text style={styles.close}>✕</Text>
+            </TouchableOpacity>
           </View>
 
           <ScrollView style={styles.form} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            <Text style={{ fontSize: 13, color: '#666', marginBottom: 8, fontWeight: '600' }}>Basic Information</Text>
+            <Text style={styles.sectionTitle}>Basic Information</Text>
             <TextInput 
               style={styles.input} 
               placeholder="Group name *" 
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.mutedForeground}
               value={groupName} 
               onChangeText={setGroupName} 
             />
@@ -173,7 +346,7 @@ export default function GroupCreateModal({ visible, onClose, onCreated }: Props)
             <TextInput 
               style={styles.input} 
               placeholder="Description (optional)" 
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.mutedForeground}
               value={groupDescription} 
               onChangeText={setGroupDescription} 
               maxLength={500} 
@@ -182,35 +355,36 @@ export default function GroupCreateModal({ visible, onClose, onCreated }: Props)
             <TextInput 
               style={styles.input} 
               placeholder="Group username (@groupname)" 
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.mutedForeground}
               value={groupUsername} 
               onChangeText={(text) => setGroupUsername(text.toLowerCase())} 
               maxLength={30} 
             />
 
-            <View style={{ marginBottom: 16 }}>
-              <Text style={{ fontSize: 13, color: '#666', marginBottom: 8, fontWeight: '600' }}>Category</Text>
-              <View style={{ borderWidth: 1, borderColor: '#e8e8e8', borderRadius: 10, overflow: 'hidden', backgroundColor: '#f8f9fa' }}>
+            <View style={{ marginBottom: spacing.lg }}>
+              <Text style={styles.sectionTitle}>Category</Text>
+              <View style={styles.pickerContainer}>
                 <Picker
                   selectedValue={groupCategory}
                   onValueChange={(value) => setGroupCategory(value)}
-                  style={{ height: 50 }}
+                  style={styles.picker}
+                  dropdownIconColor={colors.foreground}
                 >
-                  <Picker.Item label="Other" value="other" />
-                  <Picker.Item label="Study" value="study" />
-                  <Picker.Item label="Gaming" value="gaming" />
-                  <Picker.Item label="Work" value="work" />
-                  <Picker.Item label="Hobbies" value="hobbies" />
-                  <Picker.Item label="Sports" value="sports" />
-                  <Picker.Item label="Entertainment" value="entertainment" />
+                  <Picker.Item label="Other" value="other" style={{color: colors.foreground, backgroundColor: colors.card}} />
+                  <Picker.Item label="Study" value="study" style={{color: colors.foreground, backgroundColor: colors.card}} />
+                  <Picker.Item label="Gaming" value="gaming" style={{color: colors.foreground, backgroundColor: colors.card}} />
+                  <Picker.Item label="Work" value="work" style={{color: colors.foreground, backgroundColor: colors.card}} />
+                  <Picker.Item label="Hobbies" value="hobbies" style={{color: colors.foreground, backgroundColor: colors.card}} />
+                  <Picker.Item label="Sports" value="sports" style={{color: colors.foreground, backgroundColor: colors.card}} />
+                  <Picker.Item label="Entertainment" value="entertainment" style={{color: colors.foreground, backgroundColor: colors.card}} />
                 </Picker>
               </View>
             </View>
 
             <TextInput 
-              style={[styles.input, { minHeight: 100, textAlignVertical: 'top', paddingTop: 14 }]} 
+              style={[styles.input, { minHeight: 100, textAlignVertical: 'top', paddingTop: spacing.md }]} 
               placeholder="Group rules (optional)" 
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.mutedForeground}
               value={groupRules} 
               onChangeText={setGroupRules} 
               maxLength={1000}
@@ -218,7 +392,7 @@ export default function GroupCreateModal({ visible, onClose, onCreated }: Props)
               numberOfLines={4}
             />
 
-            <Text style={{ fontSize: 13, color: '#666', marginBottom: 10, fontWeight: '600' }}>Appearance & Privacy</Text>
+            <Text style={styles.sectionTitle}>Appearance & Privacy</Text>
             <View style={styles.iconRow}>
               <TouchableOpacity style={styles.iconPicker} onPress={pickImage}>
                 {iconUri ? (
@@ -233,53 +407,55 @@ export default function GroupCreateModal({ visible, onClose, onCreated }: Props)
               </TouchableOpacity>
               <View style={{ flex: 1 }}>
                 <TouchableOpacity onPress={() => setIsPublic(!isPublic)} style={styles.toggleButton}>
-                  <Text style={{ color: '#fff', fontWeight: '600', fontSize: 15 }}>{isPublic ? '🌐 Public' : '🔒 Private'}</Text>
+                  <Text style={{ color: colors.primaryForeground, fontWeight: '600', fontSize: 15 }}>{isPublic ? '🌐 Public' : '🔒 Private'}</Text>
                 </TouchableOpacity>
               </View>
             </View>
 
-            <Text style={{ fontSize: 13, color: '#666', marginBottom: 10, marginTop: 8, fontWeight: '600' }}>Add Members *</Text>
+            <Text style={[styles.sectionTitle, { marginTop: spacing.sm }]}>Add Members *</Text>
             <TextInput 
               style={styles.input} 
               placeholder="Search users (type 2+ characters)" 
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.mutedForeground}
               value={query} 
               onChangeText={setQuery} 
             />
 
             {selected.length > 0 && (
               <>
-                <Text style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>Selected ({selected.length})</Text>
+                <Text style={{ fontSize: 12, color: colors.mutedForeground, marginBottom: spacing.sm }}>Selected ({selected.length})</Text>
                 <View style={styles.selectedRow}>
                   {selected.map(u => (
                     <View key={u._id} style={styles.selectedChip}>
-                      <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>{u.name}</Text>
+                      <Text style={{ color: colors.primaryForeground, fontSize: 13, fontWeight: '600' }}>{u.name}</Text>
                     </View>
                   ))}
                 </View>
               </>
             )}
 
-            <View style={{ minHeight: 180, marginTop: 8, borderRadius: 12, overflow: 'hidden' }}>
+            <View style={styles.resultsContainer}>
               {isSearching ? (
-                <View style={{ padding: 40, alignItems: 'center' }}>
-                  <ActivityIndicator size="large" color="#007AFF" />
-                  <Text style={{ marginTop: 12, color: '#666' }}>Searching...</Text>
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={colors.primary} />
+                  <Text style={{ marginTop: spacing.md, color: colors.mutedForeground }}>Searching...</Text>
                 </View>
               ) : results.length > 0 ? (
                 <>
-                  <Text style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>Results ({results.length})</Text>
+                  <View style={{ padding: spacing.sm, backgroundColor: colors.muted }}>
+                     <Text style={{ fontSize: 12, color: colors.mutedForeground }}>Results ({results.length})</Text>
+                  </View>
                   {results.map(renderUserWrapper)}
                 </>
               ) : query.trim().length >= 2 ? (
-                <View style={{ padding: 30, alignItems: 'center' }}>
-                  <Text style={{ color: '#999', fontSize: 14 }}>No users found</Text>
+                <View style={styles.emptyContainer}>
+                  <Text style={{ color: colors.mutedForeground, fontSize: 14 }}>No users found</Text>
                 </View>
               ) : null}
             </View>
 
             <TouchableOpacity style={styles.createBtn} onPress={handleCreate} disabled={isCreating}>
-              {isCreating ? <ActivityIndicator color="#fff" /> : <Text style={styles.createText}>Create Group</Text>}
+              {isCreating ? <ActivityIndicator color={colors.primaryForeground} /> : <Text style={styles.createText}>Create Group</Text>}
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -287,157 +463,3 @@ export default function GroupCreateModal({ visible, onClose, onCreated }: Props)
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  overlay: { 
-    flex: 1, 
-    backgroundColor: 'rgba(0,0,0,0.6)', 
-    justifyContent: 'flex-end' 
-  },
-  content: { 
-    backgroundColor: '#fff', 
-    borderTopLeftRadius: 20, 
-    borderTopRightRadius: 20, 
-    maxHeight: '92%',
-    paddingBottom: 20
-  },
-  headerRow: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center',
-    padding: 20, 
-    paddingBottom: 16,
-    borderBottomWidth: 1, 
-    borderBottomColor: '#e8e8e8' 
-  },
-  header: { 
-    fontSize: 20, 
-    fontWeight: '700',
-    color: '#1a1a1a'
-  },
-  close: { 
-    fontSize: 24, 
-    color: '#666',
-    fontWeight: '300'
-  },
-  form: { 
-    padding: 20,
-    paddingTop: 16
-  },
-  input: { 
-    backgroundColor: '#f8f9fa', 
-    padding: 14, 
-    paddingHorizontal: 16,
-    borderRadius: 10, 
-    marginBottom: 16,
-    fontSize: 15,
-    borderWidth: 1,
-    borderColor: '#e8e8e8'
-  },
-  iconRow: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    marginTop: 4,
-    marginBottom: 16,
-    gap: 16
-  },
-  iconPicker: { 
-    width: 80, 
-    height: 80, 
-    borderRadius: 12, 
-    backgroundColor: '#f0f0f0', 
-    justifyContent: 'center', 
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#e0e0e0',
-    borderStyle: 'dashed'
-  },
-  iconPickerText: { 
-    color: '#666',
-    fontSize: 13,
-    fontWeight: '600'
-  },
-  iconPreview: { 
-    width: 80, 
-    height: 80, 
-    borderRadius: 12 
-  },
-  toggleButton: { 
-    backgroundColor: '#007AFF', 
-    paddingHorizontal: 20, 
-    paddingVertical: 12, 
-    borderRadius: 10,
-    minWidth: 100,
-    alignItems: 'center'
-  },
-  userItem: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    padding: 14, 
-    paddingVertical: 12,
-    borderBottomWidth: 1, 
-    borderBottomColor: '#f0f0f0',
-    backgroundColor: '#fafafa',
-    marginBottom: 1
-  },
-  userAvatar: { 
-    width: 48, 
-    height: 48, 
-    borderRadius: 24, 
-    backgroundColor: '#007AFF', 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    marginRight: 14 
-  },
-  userAvatarText: { 
-    color: '#fff', 
-    fontWeight: '700',
-    fontSize: 18
-  },
-  userName: { 
-    fontWeight: '600',
-    fontSize: 15,
-    color: '#1a1a1a'
-  },
-  userSub: { 
-    color: '#666', 
-    marginTop: 3,
-    fontSize: 13
-  },
-  selectedRow: { 
-    flexDirection: 'row', 
-    flexWrap: 'wrap', 
-    marginTop: 4,
-    marginBottom: 16,
-    gap: 10
-  },
-  selectedChip: { 
-    backgroundColor: '#007AFF', 
-    paddingHorizontal: 14, 
-    paddingVertical: 8, 
-    borderRadius: 20,
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3
-  },
-  createBtn: { 
-    backgroundColor: '#007AFF', 
-    padding: 16, 
-    borderRadius: 12, 
-    alignItems: 'center', 
-    marginTop: 24,
-    marginBottom: 8,
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 5
-  },
-  createText: { 
-    color: '#fff', 
-    fontWeight: '700',
-    fontSize: 16
-  },
-});

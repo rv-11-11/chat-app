@@ -1,22 +1,115 @@
-import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView, SafeAreaView } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView, Animated, Easing } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '../../src/store/authStore';
 import { useThemeColors } from '../../src/utils/theme';
-import type { RegisterData } from '../../src/types/auth.types';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function SignUpScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  
   const [nameFocused, setNameFocused] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
-  const [confirmFocused, setConfirmFocused] = useState(false);
-  const { register, isSigningUp } = useAuthStore();
+  
+  const { register, googleLogin, isSigningUp, isLoggingIn } = useAuthStore();
   const router = useRouter();
   const colors = useThemeColors();
+
+  // Pulse animation for logo
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.1,
+          duration: 1000,
+          useNativeDriver: true,
+          easing: Easing.inOut(Easing.ease),
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+          easing: Easing.inOut(Easing.ease),
+        }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [pulseAnim]);
+
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    androidClientId: ENV.GOOGLE_ANDROID_CLIENT_ID,
+    iosClientId: ENV.GOOGLE_IOS_CLIENT_ID,
+    webClientId: ENV.GOOGLE_WEB_CLIENT_ID,
+  });
+
+  useEffect(() => {
+    if (response?.type === 'success') {
+      const { authentication } = response;
+      fetchUserInfo(authentication?.accessToken);
+    } else if (response?.type === 'error') {
+      Alert.alert('Sign in failed', 'Google sign in encountered an error');
+    }
+  }, [response]);
+
+  const fetchUserInfo = async (token: string | undefined) => {
+    if (!token) return;
+    try {
+      const res = await fetch('https://www.googleapis.com/userinfo/v2/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const user = await res.json();
+      await googleLogin({
+        email: user.email,
+        name: user.name,
+        googleId: user.id,
+        avatar: user.picture,
+      });
+      router.replace('/(tab)');
+    } catch (error: any) {
+      console.error(error);
+      Alert.alert('Google Sign-In Failed', error?.message || 'Could not fetch user info');
+    }
+  };
+
+  const handleSignUp = async () => {
+    if (!name.trim() || !email.trim() || !password.trim()) {
+      Alert.alert('Validation Error', 'Please fill in all fields');
+      return;
+    }
+
+    if (password.length < 6) {
+      Alert.alert('Validation Error', 'Password must be at least 6 characters');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      Alert.alert('Validation Error', 'Please enter a valid email address');
+      return;
+    }
+
+    try {
+      await register({
+        name: name.trim(),
+        email: email.trim(),
+        password,
+      });
+      router.replace('/(tab)');
+    } catch (error: any) {
+      Alert.alert('Registration Failed', error.response?.data?.message || 'Failed to create account');
+    }
+  };
 
   const styles = StyleSheet.create({
     safeArea: {
@@ -26,248 +119,223 @@ export default function SignUpScreen() {
     container: {
       flexGrow: 1,
       justifyContent: 'center',
-      paddingHorizontal: 24,
-      paddingVertical: 32,
-      backgroundColor: colors.background,
+      padding: 24,
     },
-    headerContainer: {
-      marginBottom: 36,
+    card: {
+      backgroundColor: colors.card,
+      borderRadius: 24,
+      padding: 32,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.1,
+      shadowRadius: 20,
+      elevation: 5,
+    },
+    header: {
       alignItems: 'center',
+      marginBottom: 32,
     },
-    title: {
-      fontSize: 32,
-      fontWeight: '800',
-      marginBottom: 12,
-      textAlign: 'center',
-      color: colors.foreground,
-      letterSpacing: -0.5,
+    logoContainer: {
+        marginBottom: 16,
+        padding: 16,
+        backgroundColor: colors.primary + '20', // 20% opacity hex
+        borderRadius: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    appTitle: {
+        fontSize: 28,
+        fontWeight: 'bold',
+        color: colors.foreground,
+        marginTop: 12,
+        letterSpacing: 0.5,
     },
     subtitle: {
       fontSize: 16,
       color: colors.mutedForeground,
-      marginBottom: 8,
+      marginTop: 8,
       textAlign: 'center',
-      fontWeight: '500',
-      lineHeight: 24,
     },
-    form: {
-      width: '100%',
-      marginBottom: 24,
+    inputGroup: {
+      marginBottom: 20,
     },
-    inputContainer: {
-      marginBottom: 16,
-    },
-    inputLabel: {
+    label: {
       fontSize: 14,
       fontWeight: '600',
       color: colors.foreground,
       marginBottom: 8,
+      marginLeft: 4,
     },
     input: {
-      height: 56,
-      borderWidth: 1.5,
-      borderColor: colors.border,
-      borderRadius: 12,
-      paddingHorizontal: 16,
+      backgroundColor: colors.muted,
+      borderWidth: 1,
+      borderColor: 'transparent',
+      borderRadius: 16,
+      padding: 16,
       fontSize: 16,
-      backgroundColor: colors.card,
       color: colors.foreground,
-      fontWeight: '500',
     },
     inputFocused: {
       borderColor: colors.primary,
-      borderWidth: 2,
+      backgroundColor: colors.background,
     },
-    button: {
-      height: 56,
+    signUpButton: {
       backgroundColor: colors.primary,
-      borderRadius: 12,
-      justifyContent: 'center',
+      paddingVertical: 16,
+      borderRadius: 16,
       alignItems: 'center',
-      marginTop: 28,
+      marginTop: 8,
       shadowColor: colors.primary,
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.3,
       shadowRadius: 8,
-      elevation: 5,
+      elevation: 4,
     },
-    buttonDisabled: {
-      opacity: 0.6,
-    },
-    buttonText: {
-      color: colors.primaryForeground,
+    signUpButtonText: {
+      color: '#fff',
       fontSize: 16,
-      fontWeight: '700',
+      fontWeight: 'bold',
       letterSpacing: 0.5,
     },
     dividerContainer: {
       flexDirection: 'row',
       alignItems: 'center',
       marginVertical: 24,
-      gap: 12,
     },
-    divider: {
+    dividerLine: {
       flex: 1,
       height: 1,
       backgroundColor: colors.border,
     },
     dividerText: {
+      marginHorizontal: 16,
       color: colors.mutedForeground,
-      fontSize: 14,
-      fontWeight: '500',
+      fontSize: 12,
+      fontWeight: '600',
+      textTransform: 'uppercase',
+      letterSpacing: 1,
     },
-    linkButton: {
-      marginTop: 20,
+    googleButton: {
+      flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: 12,
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 16,
+      paddingVertical: 14,
+      backgroundColor: colors.background,
     },
-    linkText: {
+    googleButtonText: {
+      color: colors.foreground,
+      fontSize: 16,
+      fontWeight: '600',
+      marginLeft: 12,
+    },
+    footer: {
+      marginTop: 32,
+      alignItems: 'center',
+    },
+    footerText: {
       color: colors.mutedForeground,
       fontSize: 15,
-      fontWeight: '500',
-      textAlign: 'center',
     },
-    linkTextBold: {
+    signInLink: {
       color: colors.primary,
-      fontWeight: '700',
-    },
-    footerContainer: {
-      alignItems: 'center',
-      paddingTop: 16,
+      fontWeight: 'bold',
     },
   });
-
-  const handleSignUp = async () => {
-    if (!name.trim() || !email.trim() || !password.trim()) {
-      Alert.alert('Validation Error', 'Please fill in all fields');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      Alert.alert('Validation Error', 'Passwords do not match');
-      return;
-    }
-
-    if (password.length < 6) {
-      Alert.alert('Validation Error', 'Password must be at least 6 characters');
-      return;
-    }
-
-    try {
-      const registerData: RegisterData = {
-        name: name.trim(),
-        email: email.trim(),
-        password,
-      };
-      await register(registerData);
-      router.replace('/(tab)');
-    } catch (error: any) {
-      Alert.alert('Registration Failed', error.response?.data?.message || 'Failed to create account');
-    }
-  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={styles.headerContainer}>
-          <Text style={styles.title}>Create Account</Text>
-          <Text style={styles.subtitle}>Join and start chatting with friends</Text>
-        </View>
+        <View style={styles.card}>
+            <View style={styles.header}>
+                <Animated.View style={[styles.logoContainer, { transform: [{ scale: pulseAnim }] }]}>
+                    <Ionicons name="chatbubbles" size={40} color={colors.primary} />
+                </Animated.View>
+                <Text style={styles.appTitle}>LinkiPlay</Text>
+                <Text style={styles.subtitle}>Join the conversation</Text>
+            </View>
 
-        <View style={styles.form}>
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Full Name</Text>
-            <TextInput
-              style={[styles.input, nameFocused && styles.inputFocused]}
-              placeholder="John Doe"
-              placeholderTextColor={colors.mutedForeground}
-              value={name}
-              onChangeText={setName}
-              onFocus={() => setNameFocused(true)}
-              onBlur={() => setNameFocused(false)}
-              autoCapitalize="words"
-            />
-          </View>
+            <View style={styles.inputGroup}>
+                <Text style={styles.label}>Full Name</Text>
+                <TextInput
+                style={[styles.input, nameFocused && styles.inputFocused]}
+                value={name}
+                onChangeText={setName}
+                placeholder="Enter your name"
+                placeholderTextColor={colors.mutedForeground}
+                onFocus={() => setNameFocused(true)}
+                onBlur={() => setNameFocused(false)}
+                />
+            </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Email Address</Text>
-            <TextInput
-              style={[styles.input, emailFocused && styles.inputFocused]}
-              placeholder="name@example.com"
-              placeholderTextColor={colors.mutedForeground}
-              value={email}
-              onChangeText={setEmail}
-              onFocus={() => setEmailFocused(true)}
-              onBlur={() => setEmailFocused(false)}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoComplete="email"
-            />
-          </View>
+            <View style={styles.inputGroup}>
+                <Text style={styles.label}>Email Address</Text>
+                <TextInput
+                style={[styles.input, emailFocused && styles.inputFocused]}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="name@example.com"
+                placeholderTextColor={colors.mutedForeground}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                onFocus={() => setEmailFocused(true)}
+                onBlur={() => setEmailFocused(false)}
+                />
+            </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Password</Text>
-            <TextInput
-              style={[styles.input, passwordFocused && styles.inputFocused]}
-              placeholder="••••••••"
-              placeholderTextColor={colors.mutedForeground}
-              value={password}
-              onChangeText={setPassword}
-              onFocus={() => setPasswordFocused(true)}
-              onBlur={() => setPasswordFocused(false)}
-              secureTextEntry
-              autoCapitalize="none"
-            />
-          </View>
+            <View style={styles.inputGroup}>
+                <Text style={styles.label}>Password</Text>
+                <TextInput
+                style={[styles.input, passwordFocused && styles.inputFocused]}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Create a password"
+                placeholderTextColor={colors.mutedForeground}
+                secureTextEntry
+                onFocus={() => setPasswordFocused(true)}
+                onBlur={() => setPasswordFocused(false)}
+                />
+            </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Confirm Password</Text>
-            <TextInput
-              style={[styles.input, confirmFocused && styles.inputFocused]}
-              placeholder="••••••••"
-              placeholderTextColor={colors.mutedForeground}
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              onFocus={() => setConfirmFocused(true)}
-              onBlur={() => setConfirmFocused(false)}
-              secureTextEntry
-              autoCapitalize="none"
-            />
-          </View>
+            <TouchableOpacity 
+                style={styles.signUpButton} 
+                onPress={handleSignUp}
+                disabled={isSigningUp || isLoggingIn}
+            >
+                {(isSigningUp || isLoggingIn) ? (
+                    <ActivityIndicator color="#fff" />
+                ) : (
+                    <Text style={styles.signUpButtonText}>Create Account</Text>
+                )}
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.button, isSigningUp && styles.buttonDisabled]}
-            onPress={handleSignUp}
-            disabled={isSigningUp}
-            activeOpacity={0.8}
-          >
-            {isSigningUp ? (
-              <ActivityIndicator color={colors.primaryForeground} size="large" />
-            ) : (
-              <Text style={styles.buttonText}>Create Account</Text>
-            )}
-          </TouchableOpacity>
-        </View>
+            <View style={styles.dividerContainer}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>or</Text>
+                <View style={styles.dividerLine} />
+            </View>
 
-        <View style={styles.dividerContainer}>
-          <View style={styles.divider} />
-          <Text style={styles.dividerText}>Already member?</Text>
-          <View style={styles.divider} />
-        </View>
+            <TouchableOpacity 
+                style={styles.googleButton} 
+                onPress={() => promptAsync()}
+                disabled={!request || isSigningUp || isLoggingIn}
+            >
+                <Ionicons name="logo-google" size={24} color={colors.foreground} />
+                <Text style={styles.googleButtonText}>Sign up with Google</Text>
+            </TouchableOpacity>
 
-        <View style={styles.footerContainer}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={styles.linkButton}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.linkText}>
-              Already have an account? <Text style={styles.linkTextBold}>Sign In</Text>
-            </Text>
-          </TouchableOpacity>
+            <View style={styles.footer}>
+                <Text style={styles.footerText}>
+                    Already have an account?{' '}
+                    <Text onPress={() => router.push('/(auth)/sign-in')} style={styles.signInLink}>
+                        Log in
+                    </Text>
+                </Text>
+            </View>
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
-

@@ -4,7 +4,7 @@ import { channelApi } from '../services/api/channel';
 import { chatApi } from '../services/api/chat';
 import { connectSocket, disconnectSocket } from '../services/socket/socketClient';
 import { secureStorage } from '../services/storage/secureStore';
-import type { LoginData, RegisterData, User } from '../types/auth.types';
+import type { LoginData, RegisterData, GoogleLoginData, User } from '../types/auth.types';
 
 // Auth persistence configuration
 const AUTH_USER_KEY = 'auth_user';
@@ -62,6 +62,7 @@ interface AuthState {
   // Actions
   register: (data: RegisterData) => Promise<void>;
   login: (data: LoginData) => Promise<void>;
+  googleLogin: (data: GoogleLoginData) => Promise<void>;
   logout: () => Promise<void>;
   checkAuthStatus: () => Promise<void>;
   setUser: (user: User | null) => void;
@@ -108,6 +109,24 @@ export const useAuthStore = create<AuthState>((set) => ({
       try { connectSocket(); } catch (e) {}
       try { await processPendingInvite(); } catch (e) {}
       // Socket will be connected via useEffect in root layout
+    } catch (error: any) {
+      throw error;
+    } finally {
+      set({ isLoggingIn: false });
+    }
+  },
+
+  googleLogin: async (data: GoogleLoginData) => {
+    set({ isLoggingIn: true });
+    try {
+      const response = await authApi.googleLogin(data);
+      set({ user: response.user });
+      await persistAuth(response.user);
+      if ((response as any).token) {
+        await secureStorage.set('authToken', (response as any).token).catch(() => {});
+      }
+      try { connectSocket(); } catch (e) {}
+      try { await processPendingInvite(); } catch (e) {}
     } catch (error: any) {
       throw error;
     } finally {

@@ -9,11 +9,14 @@ export enum UserRole {
 
 export interface UserDocument extends Document {
   name: string;
+  username?: string;
   email?: string;
   phone?: string;
   password?: string;
   avatar?: string | null;
   role: UserRole;
+  isOnlineVisible?: boolean;
+  readReceipts?: boolean;
   isSuspended: boolean;
   suspendedUntil?: Date;
   suspensionReason?: string;
@@ -26,6 +29,7 @@ export interface UserDocument extends Document {
 const userSchema = new Schema<UserDocument>(
   {
     name: { type: String, required: true },
+    username: { type: String, trim: true, unique: true, sparse: true, lowercase: true },
     email: {
       type: String,
       required: true,
@@ -42,6 +46,8 @@ const userSchema = new Schema<UserDocument>(
       required: true,
     },
     avatar: { type: String, default: null },
+    isOnlineVisible: { type: Boolean, default: true },
+    readReceipts: { type: Boolean, default: true },
     role: {
       type: String,
       enum: Object.values(UserRole),

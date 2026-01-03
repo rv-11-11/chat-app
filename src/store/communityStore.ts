@@ -240,6 +240,51 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
 		}
 	},
 
+	promoteMember: async (communityId, memberId) => {
+		try {
+			const response = await communityApi.promoteToAdmin(communityId, memberId);
+			set({ currentCommunity: response.community });
+			set((state) => ({
+				communities: state.communities.map((c) => (c._id === response.community._id ? response.community : c)),
+			}));
+			return true;
+		} catch (error) {
+			console.error('Failed to promote member:', error);
+			return false;
+		}
+	},
+
+	demoteMember: async (communityId, memberId) => {
+		try {
+			const response = await communityApi.demoteFromAdmin(communityId, memberId);
+			set({ currentCommunity: response.community });
+			set((state) => ({
+				communities: state.communities.map((c) => (c._id === response.community._id ? response.community : c)),
+			}));
+			return true;
+		} catch (error) {
+			console.error('Failed to demote member:', error);
+			return false;
+		}
+	},
+
+	removeMember: async (communityId, memberId) => {
+		try {
+			// Reuse leaveCommunity API which calls the remove endpoint
+			await communityApi.leaveCommunity(communityId, memberId);
+			// Fetch updated community
+			const response = await communityApi.getCommunity(communityId);
+			set({ currentCommunity: response.community });
+			set((state) => ({
+				communities: state.communities.map((c) => (c._id === response.community._id ? response.community : c)),
+			}));
+			return true;
+		} catch (error) {
+			console.error('Failed to remove member:', error);
+			return false;
+		}
+	},
+
 	addCommunity: (community) => {
 		set((state) => {
 			if (state.communities.some((c) => c._id === community._id)) {

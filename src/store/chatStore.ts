@@ -23,6 +23,7 @@ interface ChatState {
   updateChatUnread: (chatId: string, increment?: number) => void;
   addNewChat: (chat: Chat) => void;
   markAsRead: (chatId: string) => Promise<void>;
+  clearCurrentChat: () => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -171,6 +172,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
       console.error('Failed to mark as read:', error);
     }
   },
+  
+  clearCurrentChat: () => {
+    set({
+      currentChat: null,
+      messages: [],
+    });
+  },
 }));
-
 

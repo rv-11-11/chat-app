@@ -15,6 +15,8 @@ import {
   autoJoinCommunityByInviteController,
   deleteCommunityController,
   getCommunityInviteInfoController,
+  promoteToCommunityAdminController,
+  demoteFromCommunityAdminController,
 } from "../controllers/community.controller";
 
 const communityRoutes = Router();
@@ -54,6 +56,16 @@ communityRoutes.post(
 communityRoutes.delete(
   "/:communityId/member/:memberId",
   removeMemberFromCommunityController
+);
+
+communityRoutes.post(
+  "/:communityId/admin/:memberId/promote",
+  promoteToCommunityAdminController
+);
+
+communityRoutes.post(
+  "/:communityId/admin/:memberId/demote",
+  demoteFromCommunityAdminController
 );
 
 // Allow deletion of a community by its creator or admins

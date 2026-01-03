@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View, Modal, TextInput, Share } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Image, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View, Modal, TextInput, Share } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import "../../global.css";
 import { useAuthStore } from '../../src/store/authStore';
@@ -11,13 +11,13 @@ import GroupCreateModal from '../../src/components/GroupCreateModal';
 import ChannelCreateModal from '../../src/components/ChannelCreateModal';
 import { channelApi } from '../../src/services/api/channel';
 import { userApi } from '../../src/services/api/user';
-import { Ionicons } from '@expo/vector-icons';
-import { Avatar } from '../../src/components/Avatar';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import CommunitySettingsModal from '../../src/components/CommunitySettingsModal';
 
 export default function CommunityDetailScreen() {
   const insets = useSafeAreaInsets();
   const { communityId } = useLocalSearchParams<{ communityId: string }>();
-  const { currentCommunity, getCommunity, leaveCommunity, deleteCommunity, addChatToCommunity, removeChatFromCommunity, isCommunitiesLoading } = useCommunityStore();
+  const { currentCommunity, getCommunity, leaveCommunity, deleteCommunity, addChatToCommunity, removeChatFromCommunity, isCommunitiesLoading, updateCommunity, promoteMember, demoteMember, removeMember } = useCommunityStore();
   const { chats, fetchChats } = useChatStore();
   const { user } = useAuthStore();
   const colors = useThemeColors();
@@ -40,6 +40,7 @@ export default function CommunityDetailScreen() {
   const [memberQuery, setMemberQuery] = useState('');
   const [memberResults, setMemberResults] = useState<any[]>([]);
   const [memberSearching, setMemberSearching] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const normalizeId = (value: any) => (typeof value === 'string' ? value : value?._id || '');
   const hasId = (list: any[] | undefined, id: string | undefined) => {
@@ -77,8 +78,13 @@ export default function CommunityDetailScreen() {
     headerTopRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'flex-start',
+      justifyContent: 'space-between',
       marginBottom: 12,
+    },
+    headerActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
     },
     headerActionBtn: {
       padding: 8,
@@ -97,8 +103,23 @@ export default function CommunityDetailScreen() {
       marginBottom: 16,
     },
     communityIcon: {
-      position: 'relative',
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
       marginRight: 16,
+    },
+    communityIconImage: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+    },
+    communityIconText: {
+      fontSize: 32,
+      fontWeight: '800',
+      color: colors.primaryForeground,
     },
     communityInfo: {
       flex: 1,
@@ -114,11 +135,23 @@ export default function CommunityDetailScreen() {
       color: colors.mutedForeground,
       marginTop: 4,
     },
-    communityDescription: {
-      fontSize: 14,
+    actionIconRow: {
+      flexDirection: 'row',
+      justifyContent: 'flex-start',
+      alignItems: 'center',
+      marginTop: 20,
+      gap: 24,
+    },
+    actionIconBtn: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+    },
+    actionIconLabel: {
+      fontSize: 12,
+      fontWeight: '600',
       color: colors.foreground,
-      marginTop: 12,
-      lineHeight: 20,
+      marginTop: 4,
     },
     actionButtons: {
       flexDirection: 'row',
@@ -190,6 +223,25 @@ export default function CommunityDetailScreen() {
       backgroundColor: colors.card,
       borderWidth: 1,
       borderColor: colors.border,
+    },
+    itemAvatar: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      backgroundColor: colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
+    },
+    itemAvatarImage: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+    },
+    itemAvatarText: {
+      color: colors.primaryForeground,
+      fontSize: 18,
+      fontWeight: '700',
     },
     itemInfo: {
       flex: 1,
@@ -296,26 +348,33 @@ export default function CommunityDetailScreen() {
     modalActionTextPrimary: {
       color: colors.primaryForeground,
     },
-    actionIconRow: {
-      flexDirection: 'row',
-      gap: 12,
-      marginTop: 16,
-      paddingHorizontal: 16,
-    },
-    actionIconBtn: {
-      flex: 1,
-      paddingVertical: 12,
+    menuCard: {
+      position: 'absolute',
+      top: 60,
+      right: 16,
+      backgroundColor: colors.card,
       borderRadius: 12,
-      alignItems: 'center',
       borderWidth: 1,
       borderColor: colors.border,
-      backgroundColor: colors.background,
+      paddingVertical: 8,
+      width: 220,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 10,
+      elevation: 4,
     },
-    actionIconLabel: {
-      fontSize: 13,
-      fontWeight: '600',
+    menuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      gap: 8,
+    },
+    menuItemText: {
       color: colors.foreground,
-      marginTop: 4,
+      fontSize: 14,
+      fontWeight: '600',
     },
   });
 
@@ -573,34 +632,90 @@ export default function CommunityDetailScreen() {
 
   const openSettings = () => {
     if (!currentCommunity) return;
-    setSettingsName(currentCommunity!.name || '');
-    setSettingsDescription(currentCommunity!.description || '');
-    setSettingsPublic(!!currentCommunity!.isPublic);
-    setSettingsInviteJoin(currentCommunity!.allowInviteLinkJoin !== false);
     setSettingsOpen(true);
   };
 
-  const saveSettings = async () => {
+  const handleSaveSettings = async (data: any) => {
     try {
-      if (!currentCommunity) {
-        Alert.alert('Error', 'Community not loaded');
-        return;
-      }
-      const updated = await useCommunityStore.getState().updateCommunity(communityId as string, {
-        name: settingsName.trim() || currentCommunity!.name,
-        description: settingsDescription.trim(),
-        isPublic: settingsPublic,
-        allowInviteLinkJoin: settingsInviteJoin,
-      });
+      if (!currentCommunity) return;
+      
+      const updated = await updateCommunity(communityId as string, data);
+      
       if (updated) {
         setSettingsOpen(false);
-        Alert.alert('Updated', 'Community settings updated');
+        Alert.alert('Success', 'Community settings updated');
       } else {
         Alert.alert('Error', 'Failed to update settings');
       }
     } catch (error) {
+      console.error('Save settings error:', error);
       Alert.alert('Error', 'Failed to update settings');
     }
+  };
+
+  const handlePromoteMember = async (memberId: string, memberName: string) => {
+    Alert.alert(
+      'Promote to Admin',
+      `Are you sure you want to promote ${memberName} to admin?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Promote',
+          onPress: async () => {
+            const success = await promoteMember(communityId as string, memberId);
+            if (success) {
+              Alert.alert('Success', `${memberName} is now an admin`);
+            } else {
+              Alert.alert('Error', 'Failed to promote member');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleDemoteMember = async (memberId: string, memberName: string) => {
+    Alert.alert(
+      'Demote Admin',
+      `Are you sure you want to demote ${memberName} from admin?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Demote',
+          style: 'destructive',
+          onPress: async () => {
+            const success = await demoteMember(communityId as string, memberId);
+            if (success) {
+              Alert.alert('Success', `${memberName} is no longer an admin`);
+            } else {
+              Alert.alert('Error', 'Failed to demote member');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleRemoveMember = async (memberId: string, memberName: string) => {
+    Alert.alert(
+      'Remove Member',
+      `Are you sure you want to remove ${memberName} from this community?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            const success = await removeMember(communityId as string, memberId);
+            if (success) {
+              Alert.alert('Success', `${memberName} has been removed`);
+            } else {
+              Alert.alert('Error', 'Failed to remove member');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const shareInviteLink = async () => {
@@ -652,17 +767,20 @@ export default function CommunityDetailScreen() {
 
   const renderGroupItem = ({ item }: any) => (
     <TouchableOpacity style={styles.item} onPress={() => handleChatPress(item._id)}>
-      <View style={{ marginRight: 12 }}>
-        <Avatar
-          uri={item.icon}
-          name={item.groupName || item.groupUsername || 'G'}
-          size={50}
-          shape="rounded"
-        />
+      <View style={styles.itemAvatar}>
+        {item.icon ? (
+          <Image source={{ uri: item.icon }} style={styles.itemAvatarImage} />
+        ) : (
+          <Text style={styles.itemAvatarText}>
+            {(item.groupName || item.groupUsername || 'G').charAt(0).toUpperCase()}
+          </Text>
+        )}
       </View>
       <View style={styles.itemInfo}>
         <Text style={styles.itemTitle}>{item.groupName || item.groupUsername || 'Unnamed Group'}</Text>
-        <Text style={styles.itemSubtitle}>{item.participants?.length ?? 0} members</Text>
+        <Text style={styles.itemSubtitle} numberOfLines={1}>
+          {item.groupDescription ? item.groupDescription : `${item.participants?.length ?? 0} members`}
+        </Text>
       </View>
       {isAdmin && (
         <TouchableOpacity 
@@ -677,20 +795,21 @@ export default function CommunityDetailScreen() {
 
   const renderChannelItem = ({ item }: any) => (
     <TouchableOpacity style={styles.item} onPress={() => handleChatPress(item._id)}>
-      <View style={{ marginRight: 12 }}>
-        <Avatar
-          uri={item.icon}
-          name={item.groupName || item.channelUsername || item.groupUsername || 'C'}
-          size={50}
-          shape="rounded"
-        />
+      <View style={styles.itemAvatar}>
+        {item.icon ? (
+          <Image source={{ uri: item.icon }} style={styles.itemAvatarImage} />
+        ) : (
+          <Text style={styles.itemAvatarText}>
+            {(item.groupName || item.channelUsername || item.groupUsername || 'C').charAt(0).toUpperCase()}
+          </Text>
+        )}
       </View>
       <View style={styles.itemInfo}>
         <Text style={styles.itemTitle}>
           {item.groupName || item.channelUsername || item.groupUsername || 'Unnamed Channel'}
         </Text>
-        <Text style={styles.itemSubtitle}>
-          {(item.subscriberCount ?? item.participants?.length ?? 0)} subscribers
+        <Text style={styles.itemSubtitle} numberOfLines={1}>
+          {item.description ? item.description : `${item.subscriberCount ?? item.participants?.length ?? 0} subscribers`}
         </Text>
       </View>
       {isAdmin && (
@@ -704,23 +823,56 @@ export default function CommunityDetailScreen() {
     </TouchableOpacity>
   );
 
-  const renderMemberItem = ({ item }: any) => (
-    <View style={styles.item}>
-      <View style={{ marginRight: 12 }}>
-        <Avatar
-          uri={item.profilePicture}
-          name={item.displayName || item.username || 'U'}
-          size={50}
-        />
+  const renderMemberItem = ({ item }: any) => {
+    const isItemAdmin = hasId(adminIds, item._id);
+    const isSelf = normalizeId(item) === user?._id;
+
+    return (
+      <View style={styles.item}>
+        <View style={styles.itemAvatar}>
+          {item.profilePicture ? (
+            <Image source={{ uri: item.profilePicture }} style={styles.itemAvatarImage} />
+          ) : (
+            <Text style={styles.itemAvatarText}>
+              {(item.displayName || item.username || 'U').charAt(0).toUpperCase()}
+            </Text>
+          )}
+        </View>
+        <View style={styles.itemInfo}>
+          <Text style={styles.itemTitle}>{item.displayName || item.username || 'User'}</Text>
+          <Text style={styles.itemSubtitle}>
+            {isItemAdmin ? '👑 Admin' : 'Member'}
+          </Text>
+        </View>
+        
+        {isAdmin && !isSelf && (
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {isItemAdmin ? (
+              <TouchableOpacity 
+                style={[styles.actionBtn, { backgroundColor: colors.accent + '20' }]} 
+                onPress={() => handleDemoteMember(item._id, item.displayName || item.username)}
+              >
+                <Ionicons name="arrow-down-circle-outline" size={20} color={colors.accent} />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity 
+                style={[styles.actionBtn, { backgroundColor: colors.primary + '20' }]} 
+                onPress={() => handlePromoteMember(item._id, item.displayName || item.username)}
+              >
+                <Ionicons name="arrow-up-circle-outline" size={20} color={colors.primary} />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity 
+              style={[styles.actionBtn, { backgroundColor: colors.accent + '20' }]} 
+              onPress={() => handleRemoveMember(item._id, item.displayName || item.username)}
+            >
+              <Ionicons name="trash-outline" size={20} color={colors.accent} />
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
-      <View style={styles.itemInfo}>
-        <Text style={styles.itemTitle}>{item.displayName || item.username || 'User'}</Text>
-        <Text style={styles.itemSubtitle}>
-          {hasId(adminIds, item._id) ? '👑 Admin' : 'Member'}
-        </Text>
-      </View>
-    </View>
-  );
+    );
+  };
 
   let displayData: any[] = [];
   let renderItemFunc = renderGroupItem;
@@ -732,9 +884,8 @@ export default function CommunityDetailScreen() {
     displayData = communityChannels;
     renderItemFunc = renderChannelItem;
   } else if (activeSection === 'members') {
-    // For members, we'd need to fetch user details from IDs
-    // For now, just show member count
-    displayData = [];
+    displayData = currentCommunity.members || [];
+    renderItemFunc = renderMemberItem;
   }
 
   return (
@@ -753,31 +904,79 @@ export default function CommunityDetailScreen() {
           <TouchableOpacity style={styles.headerActionBtn} onPress={() => router.back()}>
             <Ionicons name="chevron-back" size={22} color={colors.primary} />
           </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.headerActionBtn} onPress={() => setCreateGroupOpen(true)}>
+              <MaterialIcons name="group-add" size={20} color={colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.headerActionBtn} onPress={() => setCreateChannelOpen(true)}>
+              <MaterialIcons name="add-comment" size={20} color={colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.headerActionBtn} onPress={() => setMenuOpen((v) => !v)}>
+              <MaterialIcons name="more-vert" size={20} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
         </View>
+        {menuOpen && (
+          <View style={styles.menuCard}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuOpen(false); }}>
+              <Ionicons name="information-circle-outline" size={18} color={colors.foreground} />
+              <Text style={styles.menuItemText}>Community info</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuOpen(false); setActiveSection('members'); }}>
+              <Ionicons name="people-outline" size={18} color={colors.foreground} />
+              <Text style={styles.menuItemText}>View members</Text>
+            </TouchableOpacity>
+            {isMember && !isAdmin && (
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuOpen(false); handleLeave(); }}>
+                <Ionicons name="exit-outline" size={18} color={colors.accent} />
+                <Text style={[styles.menuItemText, { color: colors.accent }]}>Exit community</Text>
+              </TouchableOpacity>
+            )}
+            {isAdmin && (
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuOpen(false); openSettings(); }}>
+                <Ionicons name="settings-outline" size={18} color={colors.foreground} />
+                <Text style={styles.menuItemText}>Settings</Text>
+              </TouchableOpacity>
+            )}
+            {isAdmin && (
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuOpen(false); handleDelete(); }}>
+                <Ionicons name="trash-outline" size={18} color={colors.accent} />
+                <Text style={[styles.menuItemText, { color: colors.accent }]}>Delete</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuOpen(false); shareInviteLink(); }}>
+              <Ionicons name="share-outline" size={18} color={colors.foreground} />
+              <Text style={styles.menuItemText}>Share</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         <View style={styles.communityHeader}>
-          <View style={{ marginRight: 16 }}>
-            <Avatar
-              uri={currentCommunity.icon}
-              name={currentCommunity.name}
-              size={64}
-              shape="rounded"
-            />
+          <View style={styles.communityIcon}>
+            {currentCommunity.icon ? (
+              <Image source={{ uri: currentCommunity.icon }} style={styles.communityIconImage} />
+            ) : (
+              <Text style={styles.communityIconText}>
+                {currentCommunity.name.charAt(0).toUpperCase()}
+              </Text>
+            )}
           </View>
           <View style={styles.communityInfo}>
             <Text style={styles.communityName}>{currentCommunity.name}</Text>
             <Text style={styles.communityStats}>
               {memberIds.length} members • {groupIds.length + channelIds.length} chats
             </Text>
-            {currentCommunity.isPublic && (
-              <Text style={styles.communityStats}>🌐 Public Community</Text>
+            {currentCommunity.description ? (
+              <Text style={[styles.communityStats, { marginTop: 6 }]} numberOfLines={3}>
+                {currentCommunity.description}
+              </Text>
+            ) : (
+              currentCommunity.isPublic && (
+                <Text style={styles.communityStats}>🌐 Public Community</Text>
+              )
             )}
           </View>
         </View>
-
-        {currentCommunity.description && (
-          <Text style={styles.communityDescription}>{currentCommunity.description}</Text>
-        )}
 
         <View style={styles.actionIconRow}>
           {isAdmin && (
@@ -863,53 +1062,43 @@ export default function CommunityDetailScreen() {
         </TouchableOpacity>
       </View>
 
-      {activeSection !== 'members' ? (
-        <>
-          <FlatList
-            data={displayData}
-            keyExtractor={(item) => item._id}
-            renderItem={renderItemFunc}
-            style={styles.content}
-            ListEmptyComponent={
-              <View style={styles.center}>
-                <Text style={styles.emptyText}>
-                  No {activeSection} in this community yet
-                </Text>
-              </View>
-            }
-          />
-          {isAdmin && (
+      <FlatList
+        data={displayData}
+        keyExtractor={(item) => item._id}
+        renderItem={renderItemFunc}
+        style={styles.content}
+        ListEmptyComponent={
+          <View style={styles.center}>
+            <Text style={styles.emptyText}>
+              No {activeSection} in this community yet
+            </Text>
+          </View>
+        }
+      />
+      {isAdmin && (
+        <View style={{ paddingBottom: insets.bottom + 10 }}>
+          {activeSection === 'groups' && (
             <>
-              {activeSection === 'groups' && (
-                <View>
-                  <TouchableOpacity style={styles.addButton} onPress={() => setCreateGroupOpen(true)}>
-                    <Text style={styles.addButtonText}>+ New Group</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.addButton} onPress={handleAddChat}>
-                    <Text style={styles.addButtonText}>+ Add Group</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-              {activeSection === 'channels' && (
-                <View>
-                  <TouchableOpacity style={styles.addButton} onPress={() => setCreateChannelOpen(true)}>
-                    <Text style={styles.addButtonText}>+ New Channel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.addButton} onPress={handleAddChat}>
-                    <Text style={styles.addButtonText}>+ Add Channel</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
+              <TouchableOpacity style={styles.addButton} onPress={() => setCreateGroupOpen(true)}>
+                <Text style={styles.addButtonText}>+ New Group</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.addButton} onPress={handleAddChat}>
+                <Text style={styles.addButtonText}>+ Add Group</Text>
+              </TouchableOpacity>
             </>
           )}
-        </>
-      ) : (
-        <View style={styles.center}>
-          <Text style={styles.emptyText}>
-            {memberIds.length} member{memberIds.length !== 1 ? 's' : ''} in this community
-          </Text>
-          {isAdmin && (
-            <TouchableOpacity style={[styles.addButton]} onPress={() => setAddMemberOpen(true)}>
+          {activeSection === 'channels' && (
+            <>
+              <TouchableOpacity style={styles.addButton} onPress={() => setCreateChannelOpen(true)}>
+                <Text style={styles.addButtonText}>+ New Channel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.addButton} onPress={handleAddChat}>
+                <Text style={styles.addButtonText}>+ Add Channel</Text>
+              </TouchableOpacity>
+            </>
+          )}
+          {activeSection === 'members' && (
+            <TouchableOpacity style={styles.addButton} onPress={() => setAddMemberOpen(true)}>
               <Text style={styles.addButtonText}>+ Add Members</Text>
             </TouchableOpacity>
           )}
@@ -943,13 +1132,14 @@ export default function CommunityDetailScreen() {
                     style={[styles.item, { marginHorizontal: 0, marginVertical: 4 }]}
                     onPress={() => handleAddExistingSelect(item._id, getChatName(item))}
                   >
-                    <View style={{ marginRight: 12 }}>
-                      <Avatar
-                        uri={item.icon}
-                        name={getChatName(item)}
-                        size={50}
-                        shape="rounded"
-                      />
+                    <View style={styles.itemAvatar}>
+                      {item.icon ? (
+                        <Image source={{ uri: item.icon }} style={styles.itemAvatarImage} />
+                      ) : (
+                        <Text style={styles.itemAvatarText}>
+                          {(getChatName(item).charAt(0) || 'U').toUpperCase()}
+                        </Text>
+                      )}
                     </View>
                     <View style={styles.itemInfo}>
                       <Text style={styles.itemTitle}>{getChatName(item)}</Text>
@@ -1026,41 +1216,12 @@ export default function CommunityDetailScreen() {
         </View>
       </Modal>
 
-      <Modal transparent visible={settingsOpen} animationType="fade" onRequestClose={() => setSettingsOpen(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Community Settings</Text>
-            <TextInput style={styles.input} placeholder="Name" placeholderTextColor={colors.mutedForeground} value={settingsName} onChangeText={setSettingsName} />
-            <TextInput style={styles.input} placeholder="Description" placeholderTextColor={colors.mutedForeground} value={settingsDescription} onChangeText={setSettingsDescription} />
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <Text style={{ color: colors.foreground }}>Public</Text>
-              <TouchableOpacity
-                style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: settingsPublic ? colors.primary : colors.background }}
-                onPress={() => setSettingsPublic(!settingsPublic)}
-              >
-                <Text style={{ color: settingsPublic ? colors.primaryForeground : colors.foreground }}>{settingsPublic ? 'Yes' : 'No'}</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <Text style={{ color: colors.foreground }}>Allow Invite Link Join</Text>
-              <TouchableOpacity
-                style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: settingsInviteJoin ? colors.primary : colors.background }}
-                onPress={() => setSettingsInviteJoin(!settingsInviteJoin)}
-              >
-                <Text style={{ color: settingsInviteJoin ? colors.primaryForeground : colors.foreground }}>{settingsInviteJoin ? 'Yes' : 'No'}</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalAction} onPress={() => setSettingsOpen(false)}>
-                <Text style={styles.modalActionText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalAction, styles.modalActionPrimary]} onPress={saveSettings}>
-                <Text style={[styles.modalActionText, styles.modalActionTextPrimary]}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <CommunitySettingsModal
+        visible={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        community={currentCommunity}
+        onSave={handleSaveSettings}
+      />
     </View>
   );
 }
