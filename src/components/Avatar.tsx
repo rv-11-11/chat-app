@@ -77,10 +77,12 @@ export const Avatar: React.FC<AvatarProps> = ({
       {uri ? (
         <SmartImage
           source={uri}
-          style={[{ width: size, height: size, borderRadius }, imageStyle]}
+          containerStyle={{ width: '100%', height: '100%', borderRadius }}
+          style={[{ width: '100%', height: '100%' }, imageStyle]}
           contentFit="cover"
           fallbackElement={Fallback}
           cachePolicy="memory-disk"
+          showLoadingIndicator={showLoading}
         />
       ) : (
         Fallback

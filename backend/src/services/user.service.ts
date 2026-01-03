@@ -41,6 +41,14 @@ export const updateUserProfileService = async (
     }
   }
 
+  if (body.username && body.username !== user.username) {
+    const existing = await UserModel.findOne({ username: body.username });
+    if (existing && String(existing._id) !== userId) {
+      throw new UnauthorizedException("Username is already in use");
+    }
+    user.username = body.username;
+  }
+
   user.name = body.name;
   user.email = body.email;
 
@@ -50,6 +58,14 @@ export const updateUserProfileService = async (
 
   if (typeof body.avatar !== "undefined") {
     user.avatar = body.avatar;
+  }
+
+  if (typeof body.isOnlineVisible !== "undefined") {
+    user.isOnlineVisible = body.isOnlineVisible;
+  }
+
+  if (typeof body.readReceipts !== "undefined") {
+    user.readReceipts = body.readReceipts;
   }
 
   await user.save();

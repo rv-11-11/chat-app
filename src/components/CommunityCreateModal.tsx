@@ -2,7 +2,7 @@ import * as ImagePicker from 'expo-image-picker';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useCommunityStore } from '../store/communityStore';
-import { useThemeColors } from '../utils/theme';
+import { useThemeColors, useAppTheme } from '../utils/theme';
 import { SmartImage } from './SmartImage';
 
 interface Props {
@@ -17,7 +17,7 @@ export default function CommunityCreateModal({ visible, onClose }: Props) {
   const [isPublic, setIsPublic] = useState(true);
 
   const { createCommunity, isCreatingCommunity } = useCommunityStore();
-  const colors = useThemeColors();
+  const { colors, spacing, typography, radius, shadows } = useAppTheme();
 
   const styles = StyleSheet.create({
     overlay: {
@@ -25,35 +25,32 @@ export default function CommunityCreateModal({ visible, onClose }: Props) {
       backgroundColor: 'rgba(0,0,0,0.6)',
       justifyContent: 'center',
       alignItems: 'center',
+      padding: spacing.lg,
     },
     modal: {
-      width: '90%',
-      maxHeight: '80%',
+      width: '100%',
+      maxWidth: 500,
+      maxHeight: '85%',
       backgroundColor: colors.card,
-      borderRadius: 20,
-      padding: 24,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 12,
-      elevation: 8,
+      borderRadius: radius.xl,
+      padding: spacing.xl,
+      ...shadows.lg,
     },
     header: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: 24,
-      paddingBottom: 16,
+      marginBottom: spacing.xl,
+      paddingBottom: spacing.lg,
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
     },
     title: {
-      fontSize: 24,
-      fontWeight: '700',
+      ...typography.h3,
       color: colors.foreground,
     },
     closeBtn: {
-      padding: 8,
+      padding: spacing.xs,
     },
     closeText: {
       fontSize: 24,
@@ -61,21 +58,20 @@ export default function CommunityCreateModal({ visible, onClose }: Props) {
       fontWeight: '300',
     },
     content: {
-      gap: 20,
+      gap: spacing.lg,
     },
     label: {
-      fontSize: 14,
-      fontWeight: '600',
+      ...typography.bodySemibold,
       color: colors.foreground,
-      marginBottom: 8,
+      marginBottom: spacing.xs,
     },
     input: {
       backgroundColor: colors.background,
       borderWidth: 1,
       borderColor: colors.border,
-      borderRadius: 12,
-      paddingHorizontal: 16,
-      paddingVertical: 12,
+      borderRadius: radius.md,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
       fontSize: 16,
       color: colors.foreground,
     },
@@ -84,14 +80,14 @@ export default function CommunityCreateModal({ visible, onClose }: Props) {
       textAlignVertical: 'top',
     },
     imageSection: {
-      gap: 12,
+      gap: spacing.md,
     },
     imagePicker: {
       borderWidth: 2,
       borderStyle: 'dashed',
       borderColor: colors.border,
-      borderRadius: 12,
-      padding: 20,
+      borderRadius: radius.lg,
+      padding: spacing.xl,
       alignItems: 'center',
       justifyContent: 'center',
       minHeight: 120,
@@ -99,8 +95,8 @@ export default function CommunityCreateModal({ visible, onClose }: Props) {
     imagePreview: {
       width: 100,
       height: 100,
-      borderRadius: 12,
-      marginBottom: 12,
+      borderRadius: radius.md,
+      marginBottom: spacing.md,
     },
     imagePickerText: {
       color: colors.mutedForeground,
@@ -108,17 +104,17 @@ export default function CommunityCreateModal({ visible, onClose }: Props) {
       textAlign: 'center',
     },
     visibilitySection: {
-      gap: 12,
+      gap: spacing.md,
     },
     visibilityOptions: {
       flexDirection: 'row',
-      gap: 12,
+      gap: spacing.md,
     },
     visibilityOption: {
       flex: 1,
-      paddingVertical: 14,
-      paddingHorizontal: 16,
-      borderRadius: 12,
+      paddingVertical: spacing.lg,
+      paddingHorizontal: spacing.lg,
+      borderRadius: radius.md,
       borderWidth: 2,
       borderColor: colors.border,
       alignItems: 'center',
@@ -128,27 +124,26 @@ export default function CommunityCreateModal({ visible, onClose }: Props) {
       backgroundColor: `${colors.primary}10`,
     },
     visibilityText: {
-      fontSize: 14,
-      fontWeight: '600',
+      ...typography.bodySemibold,
       color: colors.mutedForeground,
     },
     visibilityTextActive: {
       color: colors.primary,
     },
     visibilityDesc: {
-      fontSize: 12,
+      ...typography.caption,
       color: colors.mutedForeground,
       marginTop: 4,
     },
     actions: {
       flexDirection: 'row',
-      gap: 12,
-      marginTop: 24,
+      gap: spacing.md,
+      marginTop: spacing.xl,
     },
     button: {
       flex: 1,
-      paddingVertical: 14,
-      borderRadius: 12,
+      paddingVertical: spacing.lg - 2,
+      borderRadius: radius.md,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -164,9 +159,11 @@ export default function CommunityCreateModal({ visible, onClose }: Props) {
     },
     createBtn: {
       backgroundColor: colors.primary,
+      ...shadows.md,
     },
     createBtnDisabled: {
       opacity: 0.5,
+      shadowOpacity: 0,
     },
     createText: {
       color: colors.primaryForeground,

@@ -1,5 +1,5 @@
 import apiClient from './client';
-import type { RegisterData, LoginData, AuthResponse } from '../../types/auth.types';
+import type { RegisterData, LoginData, GoogleLoginData, AuthResponse } from '../../types/auth.types';
 
 export const authApi = {
   register: async (data: RegisterData): Promise<AuthResponse> => {
@@ -9,6 +9,11 @@ export const authApi = {
 
   login: async (data: LoginData): Promise<AuthResponse> => {
     const response = await apiClient.post<AuthResponse>('/auth/login', data);
+    return response.data;
+  },
+
+  googleLogin: async (data: GoogleLoginData): Promise<AuthResponse> => {
+    const response = await apiClient.post<AuthResponse>('/auth/google', data);
     return response.data;
   },
 

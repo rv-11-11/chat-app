@@ -15,6 +15,8 @@ import {
   inviteUserToCommunityService,
   autoJoinCommunityByInviteService,
   getCommunityInviteInfoService,
+  promoteToCommunityAdminService,
+  demoteFromCommunityAdminService,
 } from "../services/community.service";
 
 import { deleteCommunityService } from "../services/community.service";
@@ -230,6 +232,42 @@ export const autoJoinCommunityByInviteController = asyncHandler(
 
     return res.status(HTTPSTATUS.OK).json({
       message: "Joined community successfully",
+      community,
+    });
+  }
+);
+
+export const promoteToCommunityAdminController = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = req.user?._id;
+    const { communityId, memberId } = req.params;
+
+    const community = await promoteToCommunityAdminService(
+      communityId,
+      memberId,
+      userId
+    );
+
+    return res.status(HTTPSTATUS.OK).json({
+      message: "Member promoted to admin successfully",
+      community,
+    });
+  }
+);
+
+export const demoteFromCommunityAdminController = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = req.user?._id;
+    const { communityId, memberId } = req.params;
+
+    const community = await demoteFromCommunityAdminService(
+      communityId,
+      memberId,
+      userId
+    );
+
+    return res.status(HTTPSTATUS.OK).json({
+      message: "Member demoted from admin successfully",
       community,
     });
   }

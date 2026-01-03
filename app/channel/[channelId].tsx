@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState, useMemo } from 'react';
-import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, ScrollView, Modal, Alert } from 'react-native';
+import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, ScrollView, Modal, Alert, Linking } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import "../../global.css";
 import { useAuthStore } from '../../src/store/authStore';
@@ -17,6 +17,7 @@ import { Video, ResizeMode } from 'expo-av'
 import { userApi } from '../../src/services/api/user';
 import { Ionicons } from '@expo/vector-icons';
 import { SmartImage } from '../../src/components/SmartImage';
+import MediaPreviewModal from '../../src/components/MediaPreviewModal';
 import { Avatar } from '../../src/components/Avatar';
 
 interface Channel {
@@ -55,7 +56,15 @@ export default function ChannelDetailScreen() {
   const [editDescription, setEditDescription] = useState('');
   const [editUsername, setEditUsername] = useState('');
   const [editIcon, setEditIcon] = useState('');
-  const [pendingImage, setPendingImage] = useState<string | null>(null);
+  const [isPreviewVisible, setIsPreviewVisible] = useState(false);
+  const [previewMedia, setPreviewMedia] = useState<{
+    type: 'image' | 'video';
+    uri: string;
+    base64?: string | null;
+    name?: string;
+    mimeType?: string;
+    size?: number;
+  } | null>(null);
   
   // Member search state
   const [memberQuery, setMemberQuery] = useState('');
@@ -168,6 +177,53 @@ export default function ChannelDetailScreen() {
     }
   };
 
+  const handleSendMedia = async (caption: string) => {
+    if (!previewMedia || !channelId) return;
+    try {
+      if (previewMedia.type === 'image') {
+        let imageBase64 = previewMedia.base64;
+        if (!imageBase64 && previewMedia.uri) {
+          try {
+            imageBase64 = await FileSystem.readAsStringAsync(previewMedia.uri, { encoding: FileSystem.EncodingType.Base64 });
+          } catch (readError) {
+            console.error('Failed to read image as base64:', readError);
+          }
+        }
+        if (!imageBase64) {
+          Alert.alert('Error', 'Failed to process image');
+          return;
+        }
+        const finalImage = imageBase64.startsWith('data:')
+          ? imageBase64
+          : `data:image/jpeg;base64,${imageBase64}`;
+        await sendMessage({
+          chatId: channelId,
+          image: finalImage,
+          content: caption.trim() || undefined,
+        });
+      } else {
+        const base64Data = await FileSystem.readAsStringAsync(previewMedia.uri, { encoding: FileSystem.EncodingType.Base64 });
+        const mimeType = previewMedia.mimeType || 'video/mp4';
+        const finalData = `data:${mimeType};base64,${base64Data}`;
+        await sendMessage({
+          chatId: channelId,
+          video: {
+            data: finalData,
+            name: previewMedia.name || 'video',
+            type: mimeType,
+            size: previewMedia.size || 0,
+          },
+          content: caption.trim() || undefined,
+        });
+      }
+      setIsPreviewVisible(false);
+      setPreviewMedia(null);
+    } catch (error: any) {
+      console.error('Failed to send media:', error);
+      Alert.alert('Error', 'Failed to send media');
+    }
+  };
+
   const handleSubscribe = async () => {
     if (!channelId) return;
     
@@ -221,21 +277,15 @@ export default function ChannelDetailScreen() {
         ? imageBase64 
         : `data:image/jpeg;base64,${imageBase64}`;
 
-      setPendingImage(finalImage);
+      setPreviewMedia({
+        type: 'image',
+        uri: asset.uri,
+        base64: finalImage,
+      });
+      setIsPreviewVisible(true);
     } catch (e) {
       console.error('Image pick failed:', e);
       Alert.alert('Error', 'Failed to select image');
-    }
-  };
-
-  const handleSendPendingImage = async () => {
-    if (!pendingImage || !channelId) return;
-    try {
-      await sendMessage({ chatId: channelId, image: pendingImage });
-      setPendingImage(null);
-    } catch (error) {
-      console.error('Failed to send image:', error);
-      Alert.alert('Error', 'Failed to send image');
     }
   };
 
@@ -251,15 +301,14 @@ export default function ChannelDetailScreen() {
         return;
       }
 
-      const uri: string = asset.uri;
-      const name: string = asset.name || 'video';
-      const type: string = asset.mimeType || 'video/mp4';
-      const size: number = asset.size || 0;
-      const data = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
-      await sendMessage({
-        chatId: channelId,
-        video: { data, name, type, size },
+      setPreviewMedia({
+        type: 'video',
+        uri: asset.uri,
+        name: asset.name,
+        mimeType: asset.mimeType,
+        size: asset.size
       });
+      setIsPreviewVisible(true);
     } catch (e) {
       console.error('Video pick failed:', e);
       Alert.alert('Error', 'Failed to select video');
@@ -639,6 +688,50 @@ export default function ChannelDetailScreen() {
     },
   }), [colors]);
 
+  const renderRichText = (text: string) => {
+    // Regex matches:
+    // 1. http:// or https:// or www. followed by non-whitespace
+    // 2. Domain-like patterns (something.com, etc.)
+    const urlRegex = /((?:https?:\/\/|www\.)[^\s]+|[a-zA-Z0-9][a-zA-Z0-9-]+\.(?:com|net|org|edu|gov|io|co|in|biz|info|me|app|dev)(?:\/[^\s]*)?)/gi;
+    const parts = text.split(urlRegex);
+    return parts.map((part, index) => {
+      if (part.match(urlRegex)) {
+        return (
+          <Text
+            key={index}
+            style={{ color: '#0000EE', textDecorationLine: 'underline', fontWeight: 'bold' }}
+            onPress={() => {
+              let url = part;
+              if (!/^https?:\/\//i.test(url)) {
+                url = 'https://' + url;
+              }
+              Linking.openURL(url).catch(err => console.error("Couldn't load page", err));
+            }}
+          >
+            {part}
+          </Text>
+        );
+      }
+      
+      // Parse Bold *text*
+      const boldParts = part.split(/\*([^*]+)\*/g);
+      return boldParts.map((subPart, subIndex) => {
+        if (subIndex % 2 === 1) { // Matched group
+           return <Text key={`${index}-${subIndex}`} style={{ fontWeight: 'bold' }}>{subPart}</Text>;
+        }
+        
+        // Parse Italic _text_
+        const italicParts = subPart.split(/_([^_]+)_/g);
+        return italicParts.map((subSubPart, subSubIndex) => {
+            if (subSubIndex % 2 === 1) {
+                return <Text key={`${index}-${subIndex}-${subSubIndex}`} style={{ fontStyle: 'italic' }}>{subSubPart}</Text>;
+            }
+            return <Text key={`${index}-${subIndex}-${subSubIndex}`}>{subSubPart}</Text>;
+        });
+      });
+    });
+  };
+
   const renderMessage = ({ item }: { item: Message }) => {
     const isMyMessage = item.sender?._id === user?._id;
     const imageSrc = item.image
@@ -681,12 +774,20 @@ export default function ChannelDetailScreen() {
           )}
           {item.content && (
             <Text style={[styles.messageText, isMyMessage && styles.myMessageText]}>
-              {item.content}
+              {renderRichText(item.content)}
             </Text>
           )}
-          <Text style={[styles.messageTime, isMyMessage && styles.myMessageTime]}>
-            {formatMessageTime(item.createdAt)}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 2, gap: 4 }}>
+            <Text style={[styles.messageTime, isMyMessage && styles.myMessageTime]}>
+              {formatMessageTime(item.createdAt)}
+            </Text>
+            {isMyMessage && (
+               <Ionicons name="checkmark-done" size={14} color={styles.myMessageTime.color} />
+            )}
+            <TouchableOpacity hitSlop={10} onPress={() => handleMessageOptions(item)}>
+              <Ionicons name="ellipsis-vertical" size={14} color={isMyMessage ? 'rgba(255,255,255,0.7)' : colors.mutedForeground} />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     );
@@ -816,20 +917,7 @@ export default function ChannelDetailScreen() {
               behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
               keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
             >
-              {pendingImage && (
-                <View style={styles.pendingCard}>
-                  <Text style={styles.pendingLabel}>Ready to send</Text>
-                  <SmartImage source={{ uri: pendingImage }} style={styles.pendingPreview} contentFit="cover" />
-                  <View style={styles.pendingActions}>
-                    <TouchableOpacity style={[styles.pendingButton, styles.pendingCancel]} onPress={() => setPendingImage(null)}>
-                      <Text style={styles.pendingCancelText}>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[styles.pendingButton, styles.pendingSend]} onPress={handleSendPendingImage} disabled={isSendingMessage}>
-                      <Text style={styles.pendingSendText}>{isSendingMessage ? 'Sending...' : 'Send image'}</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
+              
 
               <View style={styles.inputContainer}>
                 <TouchableOpacity style={styles.mediaButton} onPress={handlePickImage} disabled={isSendingMessage}>
@@ -856,6 +944,16 @@ export default function ChannelDetailScreen() {
                   <Ionicons name="send" size={20} color={colors.primaryForeground} />
                 </TouchableOpacity>
               </View>
+              <MediaPreviewModal
+                visible={isPreviewVisible}
+                onClose={() => {
+                  setIsPreviewVisible(false);
+                  setPreviewMedia(null);
+                }}
+                onSend={handleSendMedia}
+                media={previewMedia}
+                isSending={isSendingMessage}
+              />
             </KeyboardAvoidingView>
           )}
         </>

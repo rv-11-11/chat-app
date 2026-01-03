@@ -547,3 +547,92 @@ export const deleteCommunityService = async (communityId: string, userId: string
 
   return { message: "Community deleted successfully" };
 };
+
+export const promoteToCommunityAdminService = async (
+  communityId: string,
+  memberId: string,
+  userId: string
+) => {
+  const community = await CommunityModel.findById(communityId);
+
+  if (!community) {
+    throw new NotFoundException("Community not found");
+  }
+
+  // Verify user is admin of community
+  const isAdmin = community.admins.some((id) => id.toString() === userId.toString());
+  if (!isAdmin) {
+    throw new ForbiddenException("Only community admins can promote members");
+  }
+
+  const isMember = community.members.some(
+    (id) => id.toString() === memberId
+  );
+
+  if (!isMember) {
+    throw new BadRequestException("User is not a member of this community");
+  }
+
+  const isAlreadyAdmin = community.admins.some(
+    (id) => id.toString() === memberId
+  );
+
+  if (isAlreadyAdmin) {
+    throw new BadRequestException("User is already an admin");
+  }
+
+  community.admins.push(new mongoose.Types.ObjectId(memberId));
+  await community.save();
+
+  const populatedCommunity = await community.populate([
+    { path: "members", select: "name avatar _id" },
+    { path: "admins", select: "name avatar _id" },
+  ]);
+
+  return populatedCommunity;
+};
+
+export const demoteFromCommunityAdminService = async (
+  communityId: string,
+  memberId: string,
+  userId: string
+) => {
+  const community = await CommunityModel.findById(communityId);
+
+  if (!community) {
+    throw new NotFoundException("Community not found");
+  }
+
+  // Verify user is admin of community
+  const isAdmin = community.admins.some((id) => id.toString() === userId.toString());
+  if (!isAdmin) {
+    throw new ForbiddenException("Only community admins can demote members");
+  }
+
+  // Prevent removing last admin
+  if (community.admins.length === 1) {
+    throw new ForbiddenException("Cannot remove the last admin");
+  }
+  
+  // Prevent removing yourself (optional, but good practice usually, though sometimes you want to leave admin role)
+  // For now let's allow it unless it's the creator? 
+  // Let's just check if they are admin.
+
+  const adminIndex = community.admins.findIndex(
+    (id) => id.toString() === memberId
+  );
+
+  if (adminIndex === -1) {
+    throw new BadRequestException("User is not an admin");
+  }
+
+  community.admins.splice(adminIndex, 1);
+  await community.save();
+
+  const populatedCommunity = await community.populate([
+    { path: "members", select: "name avatar _id" },
+    { path: "admins", select: "name avatar _id" },
+  ]);
+
+  return populatedCommunity;
+};

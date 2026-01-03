@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, Alert } from 'react-native';
+import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, Alert, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import GroupDetailsModal from '../../src/components/GroupDetailsModal';
 import MediaPreviewModal from '../../src/components/MediaPreviewModal';
@@ -331,7 +331,12 @@ export default function ChatScreen() {
         ? imageBase64
         : `data:image/jpeg;base64,${imageBase64}`;
 
-      setPendingImage(finalImage);
+      setPreviewMedia({
+        type: 'image',
+        uri: asset.uri,
+        base64: finalImage,
+      });
+      setIsPreviewVisible(true);
     } catch (e) {
       console.error('Image pick failed:', e);
       Alert.alert('Error', 'Failed to select image');
@@ -442,6 +447,50 @@ export default function ChatScreen() {
     return `${typingUsers.length} people are typing...`;
   };
 
+  const renderRichText = (text: string) => {
+    // Regex matches:
+    // 1. http:// or https:// or www. followed by non-whitespace
+    // 2. Domain-like patterns (something.com, etc.)
+    const urlRegex = /((?:https?:\/\/|www\.)[^\s]+|[a-zA-Z0-9][a-zA-Z0-9-]+\.(?:com|net|org|edu|gov|io|co|in|biz|info|me|app|dev)(?:\/[^\s]*)?)/gi;
+    const parts = text.split(urlRegex);
+    return parts.map((part, index) => {
+      if (part.match(urlRegex)) {
+        return (
+          <Text
+            key={index}
+            style={{ color: '#0000EE', textDecorationLine: 'underline', fontWeight: 'bold' }}
+            onPress={() => {
+              let url = part;
+              if (!/^https?:\/\//i.test(url)) {
+                url = 'https://' + url;
+              }
+              Linking.openURL(url).catch(err => console.error("Couldn't load page", err));
+            }}
+          >
+            {part}
+          </Text>
+        );
+      }
+      
+      // Parse Bold *text*
+      const boldParts = part.split(/\*([^*]+)\*/g);
+      return boldParts.map((subPart, subIndex) => {
+        if (subIndex % 2 === 1) { // Matched group
+           return <Text key={`${index}-${subIndex}`} style={{ fontWeight: 'bold' }}>{subPart}</Text>;
+        }
+        
+        // Parse Italic _text_
+        const italicParts = subPart.split(/_([^_]+)_/g);
+        return italicParts.map((subSubPart, subSubIndex) => {
+            if (subSubIndex % 2 === 1) {
+                return <Text key={`${index}-${subIndex}-${subSubIndex}`} style={{ fontStyle: 'italic' }}>{subSubPart}</Text>;
+            }
+            return <Text key={`${index}-${subIndex}-${subSubIndex}`}>{subSubPart}</Text>;
+        });
+      });
+    });
+  };
+
   const renderMessage = ({ item }: { item: Message }) => {
     if (item.messageType === 'SYSTEM') {
       return (
@@ -501,12 +550,20 @@ export default function ChatScreen() {
           )}
           {item.content && (
             <Text style={[styles.messageText, isMyMessage && styles.myMessageText]}>
-              {item.content}
+              {renderRichText(item.content)}
             </Text>
           )}
-          <Text style={[styles.messageTime, isMyMessage && styles.myMessageTime]}>
-            {formatMessageTime(item.createdAt)}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 2, gap: 4 }}>
+            <Text style={[styles.messageTime, isMyMessage && styles.myMessageTime]}>
+              {formatMessageTime(item.createdAt)}
+            </Text>
+            {isMyMessage && (
+               <Ionicons name="checkmark-done" size={14} color={styles.myMessageTime.color} />
+            )}
+            <TouchableOpacity hitSlop={10} onPress={() => handleMessageOptions(item)}>
+              <Ionicons name="ellipsis-vertical" size={14} color={isMyMessage ? 'rgba(255,255,255,0.7)' : colors.mutedForeground} />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     );
@@ -592,32 +649,7 @@ export default function ChatScreen() {
         scrollEnabled={true}
         ListFooterComponent={
           <>
-            {pendingImage && (
-              <View style={styles.pendingCard}>
-                <Text style={styles.pendingLabel}>Sending Image...</Text>
-                <SmartImage 
-                  source={pendingImage}
-                  containerStyle={styles.pendingPreview}
-                  contentFit="cover"
-                  showLoadingIndicator={true}
-                />
-                <View style={styles.pendingActions}>
-                  <TouchableOpacity 
-                    style={[styles.pendingButton, styles.pendingCancel]}
-                    onPress={() => setPendingImage(null)}
-                  >
-                    <Text style={styles.pendingCancelText}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.pendingButton, styles.pendingSend]}
-                    onPress={handleSendPendingImage}
-                    disabled={isSendingMessage}
-                  >
-                    <Text style={styles.pendingSendText}>Send</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
+            
             {typingUsers.length > 0 ? (
               <View style={styles.typingIndicator}>
                 <View style={styles.typingDot} />
@@ -670,6 +702,5 @@ export default function ChatScreen() {
     </KeyboardAvoidingView>
   );
 }
-
 
 

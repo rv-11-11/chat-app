@@ -124,4 +124,24 @@ export const communityApi = {
     );
     return response.data;
   },
+
+  promoteToAdmin: async (
+    communityId: string,
+    memberId: string
+  ): Promise<{ community: CommunityType }> => {
+    const response = await apiClient.post<{ community: CommunityType }>(
+      `/community/${communityId}/admin/${memberId}/promote`
+    );
+    return response.data;
+  },
+
+  demoteFromAdmin: async (
+    communityId: string,
+    memberId: string
+  ): Promise<{ community: CommunityType }> => {
+    const response = await apiClient.post<{ community: CommunityType }>(
+      `/community/${communityId}/admin/${memberId}/demote`
+    );
+    return response.data;
+  },
 };
