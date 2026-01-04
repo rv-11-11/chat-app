@@ -42,6 +42,9 @@ export const SOCKET_EVENTS = {
   ADMIN_LEAVE_REPORTS: 'admin:leave-reports-room',
   REPORT_CREATED: 'report:created',
   REPORT_STATUS_CHANGED: 'report:status-changed',
+
+  // Notifications
+  NOTIFICATION_NEW: 'notification:new',
 } as const;
 
 export const API_ENDPOINTS = {

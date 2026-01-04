@@ -19,7 +19,9 @@
       "permissions": [
         "INTERNET",
         "ACCESS_NETWORK_STATE",
-        "POST_NOTIFICATIONS"
+        "POST_NOTIFICATIONS",
+        "RECORD_AUDIO",
+        "CAMERA"
       ],
       "enableProguardInReleaseBuilds": true,
       "adaptiveIcon": {
@@ -62,8 +64,12 @@
       "reactCompiler": true
     },
     "extra": {
-      "apiUrl": "http://192.168.1.168:9000",
-      "socketUrl": "http://192.168.1.168:9000"
+      "apiUrl": "https://chat-app-qwrr.onrender.com",
+      "socketUrl": "https://chat-app-qwrr.onrender.com",
+  "privacyPolicyUrl": "https://yourdomain.com/privacy",
+      "googleWebClientId": "170631155124-jt38kvf290u2pa6dht834bmblv527tsq.apps.googleusercontent.com",
+      "googleIosClientId": "YOUR_IOS_CLIENT_ID.apps.googleusercontent.com",
+      "googleAndroidClientId": "170631155124-38er02pg8ve6ar9ts6h2u0udhk3hgek3.apps.googleusercontent.com"
     }
   }
 }

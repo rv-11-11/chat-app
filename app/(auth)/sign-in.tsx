@@ -7,7 +7,7 @@ import type { LoginData } from '../../src/types/auth.types';
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
-import { ENV } from '../../src/config/env';
+import Constants from 'expo-constants';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -42,10 +42,11 @@ export default function SignInScreen() {
     return () => pulse.stop();
   }, [pulseAnim]);
 
+  const extras = (Constants.expoConfig && (Constants.expoConfig as any).extra) || (Constants.manifest && (Constants.manifest as any).extra) || {};
   const [request, response, promptAsync] = Google.useAuthRequest({
-    androidClientId: ENV.GOOGLE_ANDROID_CLIENT_ID,
-    iosClientId: ENV.GOOGLE_IOS_CLIENT_ID,
-    webClientId: ENV.GOOGLE_WEB_CLIENT_ID,
+    androidClientId: extras.googleAndroidClientId || extras.googleAndroidClientId || '',
+    iosClientId: extras.googleIosClientId || extras.googleIosClientId || '',
+    webClientId: extras.googleWebClientId || extras.googleWebClientId || '',
   });
 
   useEffect(() => {

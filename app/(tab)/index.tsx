@@ -1,3 +1,6 @@
+import { Avatar } from '../../src/components/Avatar';
+import DrawerToggle from '../../src/components/DrawerToggle';
+import { Ionicons } from '@expo/vector-icons';
 import { useMemo, useEffect, useState, useCallback } from 'react';
 import {
   StyleSheet,
@@ -70,6 +73,10 @@ const Home = () => {
     groups: any[];
   }>({ users: [], channels: [], communities: [], groups: [] });
   const [isSearching, setIsSearching] = useState(false);
+  
+  // NEW: Error states
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [discoverError, setDiscoverError] = useState<string | null>(null);
 
   // Read route params to toggle Discover and prefill search
   const params = useLocalSearchParams<{ discover?: string | string[]; search?: string | string[]; q?: string | string[] }>();
@@ -118,9 +125,13 @@ const Home = () => {
   };
 
   const fetchDiscoverChannels = async () => {
-    if (discoverChannels.length > 0) return;
+    // Always fetch if we don't have data, or if we want to refresh. 
+    // Removing the early return allows retrying if it failed previously or if we want fresh data.
+    // However, to prevent spamming, we can check loading state.
+    if (loadingDiscover) return;
     
     setLoadingDiscover(true);
+    setDiscoverError(null); // Reset error
     try {
       const response = await apiClient.get('/channel/public?limit=50');
       const publicChannels = (response.data.channels || []).filter(
@@ -130,6 +141,7 @@ const Home = () => {
     } catch (error: any) {
       console.log('Discover channels not available:', error?.response?.status);
       setDiscoverChannels([]);
+      setDiscoverError('Failed to load discover channels. Please try again.'); // Set error
     } finally {
       setLoadingDiscover(false);
     }
@@ -164,6 +176,8 @@ const Home = () => {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    setSearchError(null); // Clear errors on refresh
+    setDiscoverError(null);
     await loadData();
     setRefreshing(false);
   }, []);
@@ -212,6 +226,7 @@ const Home = () => {
     if (!showDiscover) return;
     
     setIsSearching(true);
+    setSearchError(null); // Reset error
     try {
       // Call multiple endpoints in parallel to get different types of results
       const [usersRes, channelsRes, communitiesRes] = await Promise.allSettled([
@@ -236,9 +251,16 @@ const Home = () => {
         communities: Array.isArray(communities) ? communities : [],
         groups: [], // Groups are from local chats, not from global search
       });
+      
+      // If all failed, set error
+      if (usersRes.status === 'rejected' && channelsRes.status === 'rejected' && communitiesRes.status === 'rejected') {
+        setSearchError('Failed to perform search. Please try again.');
+      }
+
     } catch (error: any) {
       console.log('Global search error:', error?.message);
       setGlobalSearchResults({ users: [], channels: [], communities: [], groups: [] });
+      setSearchError('An unexpected error occurred during search.');
     } finally {
       setIsSearching(false);
     }
@@ -452,7 +474,6 @@ const Home = () => {
     container: {
       flex: 1,
       backgroundColor: colors.background,
-      paddingTop: insets.top,
     },
     header: {
       padding: 16,
@@ -461,7 +482,7 @@ const Home = () => {
       backgroundColor: colors.background,
     },
     headerContent: {
-      marginBottom: 16,
+      marginBottom: 0,
     },
     headerTop: {
       flexDirection: 'row',
@@ -478,17 +499,11 @@ const Home = () => {
       flexDirection: 'row',
       alignItems: 'center',
       backgroundColor: colors.card,
-      borderRadius: 14,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
-      marginBottom: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
-      shadowColor: '#000',
-      shadowOpacity: 0.03,
-      shadowRadius: 6,
-      shadowOffset: { width: 0, height: 2 },
-      elevation: 1,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      marginBottom: 0,
+      borderWidth: 0,
     },
     searchInput: {
       flex: 1,
@@ -498,25 +513,22 @@ const Home = () => {
     },
     tabContainer: {
       flexDirection: 'row',
-      gap: 8,
+      gap: 12,
       marginBottom: 0,
-      backgroundColor: colors.muted,
-      padding: 4,
-      borderRadius: 10,
+      paddingHorizontal: 0,
+      backgroundColor: 'transparent',
     },
     tab: {
-      flex: 1,
-      paddingHorizontal: 14,
-      paddingVertical: 9,
-      borderRadius: 8,
-      backgroundColor: 'transparent',
+      paddingHorizontal: 20,
+      paddingVertical: 8,
+      borderRadius: 20,
+      backgroundColor: colors.muted, // Default inactive background
       borderWidth: 0,
       alignItems: 'center',
       justifyContent: 'center',
     },
     activeTab: {
       backgroundColor: colors.primary,
-      borderColor: colors.primary,
     },
     tabText: {
       fontSize: 14,
@@ -541,12 +553,11 @@ const Home = () => {
     sponsoredCard: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: `${colors.primary}15`,
+      backgroundColor: colors.card,
       borderRadius: 14,
       padding: 14,
       marginBottom: 8,
-      borderWidth: 1,
-      borderColor: `${colors.primary}35`,
+      borderWidth: 0,
     },
     channelIcon: {
       width: 48,
@@ -691,6 +702,16 @@ const Home = () => {
     actionButton: {
       padding: 8,
       marginLeft: 4,
+    },
+    errorContainer: {
+      padding: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    errorText: {
+      color: 'red',
+      textAlign: 'center',
+      marginBottom: 10,
     },
   });
 
@@ -894,20 +915,25 @@ const Home = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerContent}>
-          <View style={styles.headerTop}>
-            <Text style={styles.title}>{showDiscover ? 'Discover' : 'Messages'}</Text>
-          </View>
-
           {/* Search Bar */}
           <View style={styles.searchContainer}>
-            <SearchIcon />
+            <Ionicons name="search" size={20} color={colors.mutedForeground} />
             <TextInput
-              style={styles.searchInput}
-              placeholder={showDiscover ? "Search channels, communities..." : "Search messages..."}
+              style={[styles.searchInput, { outlineStyle: 'none' } as any]}
+              placeholder="Search communities, channels, and groups..."
               placeholderTextColor={colors.mutedForeground}
               value={searchQuery}
               onChangeText={setSearchQuery}
+              selectionColor={colors.primary}
+              underlineColorAndroid="transparent"
             />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Ionicons name="close-circle" size={20} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            )}
+          </View>
+          <View style={{ marginLeft: 12 }}>
           </View>
         </View>
 
@@ -935,12 +961,13 @@ const Home = () => {
       </View>
 
       <ScrollView
+        contentContainerStyle={{ paddingBottom: 110 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
         {/* Sponsored Channels - only show if we have channels */}
-        {sponsoredChannels.length > 0 && (
+        {/* commented out as requested */ false && sponsoredChannels.length > 0 && (
           <View style={styles.sponsoredSection}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
               <StarIcon />
@@ -1048,6 +1075,13 @@ const Home = () => {
                     <View style={styles.loader}>
                       <ActivityIndicator size="large" color={colors.primary} />
                     </View>
+                  ) : searchError ? (
+                    <View style={styles.errorContainer}>
+                      <Text style={styles.errorText}>{searchError}</Text>
+                      <TouchableOpacity onPress={() => performGlobalSearch(debouncedSearchQuery)}>
+                         <Ionicons name="refresh" size={24} color={colors.primary} />
+                      </TouchableOpacity>
+                    </View>
                   ) : totalItems === 0 ? (
                     <View style={styles.emptyContainer}>
                       <Text style={{ fontSize: 48 }}>🔍</Text>
@@ -1076,6 +1110,13 @@ const Home = () => {
                   {loadingDiscover ? (
                     <View style={styles.loader}>
                       <ActivityIndicator size="large" color={colors.primary} />
+                    </View>
+                  ) : discoverError ? (
+                    <View style={styles.errorContainer}>
+                       <Text style={styles.errorText}>{discoverError}</Text>
+                       <TouchableOpacity onPress={fetchDiscoverChannels}>
+                          <Text style={{ color: colors.primary }}>Try Again</Text>
+                       </TouchableOpacity>
                     </View>
                   ) : discoverChannels.length === 0 ? (
                     <View style={[styles.emptyContainer, { paddingHorizontal: 16 }]}>
