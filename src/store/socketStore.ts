@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { Socket } from 'socket.io-client';
 import { connectSocket, disconnectSocket, getSocket } from '../services/socket/socketClient';
 import { SOCKET_EVENTS } from '../utils/constants';
+import { useNotificationStore } from './notificationStore';
 
 interface SocketState {
   socket: Socket | null;
@@ -51,6 +52,10 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
     socket.on(SOCKET_EVENTS.ONLINE_USERS, (userIds: string[]) => {
       set({ onlineUsers: userIds });
+    });
+
+    socket.on(SOCKET_EVENTS.NOTIFICATION_NEW, (notification: any) => {
+      useNotificationStore.getState().addNotification(notification);
     });
   },
 

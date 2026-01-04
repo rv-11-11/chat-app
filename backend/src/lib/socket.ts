@@ -217,6 +217,12 @@ export const initializeSocket = (httpServer: HTTPServer) => {
   });
 };
 
+export const sendNotification = (userId: string, notification: any) => {
+  if (io) {
+    io.to(`user:${userId}`).emit("notification:new", notification);
+  }
+};
+
 function getIO() {
   if (!io) throw new Error("Socket.IO not initialized");
   return io;

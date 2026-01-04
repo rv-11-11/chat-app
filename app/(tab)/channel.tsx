@@ -10,6 +10,7 @@ import { Chat } from '../../src/types/chat.types';
 import { useAuthStore } from '../../src/store/authStore';
 import { Ionicons } from '@expo/vector-icons';
 import { Avatar } from '../../src/components/Avatar';
+import NotificationDropdown from '../../src/components/NotificationDropdown';
 
 // Enable LayoutAnimation for Android
 if (Platform.OS === 'android') {
@@ -498,9 +499,12 @@ export default function ChannelListScreen() {
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <Text style={styles.headerTitle}>Channels</Text>
-          <TouchableOpacity style={styles.newButton} onPress={() => setIsCreateOpen(true)}>
-            <Ionicons name="add" size={24} color={colors.primaryForeground} />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <NotificationDropdown />
+            <TouchableOpacity style={styles.newButton} onPress={() => setIsCreateOpen(true)}>
+              <Ionicons name="add" size={24} color={colors.primaryForeground} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.tabs}>

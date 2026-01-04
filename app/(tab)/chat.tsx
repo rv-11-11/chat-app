@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import NewChatModal from '../../src/components/NewChatModal';
+import NotificationDropdown from '../../src/components/NotificationDropdown';
 import { Avatar } from '../../src/components/Avatar';
 import { useSocket } from '../../src/hooks/useSocket';
 import { useAuthStore } from '../../src/store/authStore';
@@ -336,12 +337,15 @@ export default function ChatListScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Chats</Text>
-        <TouchableOpacity
-          style={styles.newChatButton}
-          onPress={() => setIsNewChatModalVisible(true)}
-        >
-          <Text style={styles.newChatButtonText}>+</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <NotificationDropdown />
+          <TouchableOpacity
+            style={styles.newChatButton}
+            onPress={() => setIsNewChatModalVisible(true)}
+          >
+            <Text style={styles.newChatButtonText}>+</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.searchContainer}>

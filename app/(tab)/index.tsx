@@ -1,3 +1,6 @@
+import { Avatar } from '../../src/components/Avatar';
+import DrawerToggle from '../../src/components/DrawerToggle';
+import { Ionicons } from '@expo/vector-icons';
 import { useMemo, useEffect, useState, useCallback } from 'react';
 import {
   StyleSheet,
@@ -56,6 +59,7 @@ const Home = () => {
   const [discoverChannels, setDiscoverChannels] = useState<ChannelType[]>([]);
   const [sponsoredChannels, setSponsoredChannels] = useState<ChannelType[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [showDiscover, setShowDiscover] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingChannels, setLoadingChannels] = useState(false);
@@ -69,6 +73,10 @@ const Home = () => {
     groups: any[];
   }>({ users: [], channels: [], communities: [], groups: [] });
   const [isSearching, setIsSearching] = useState(false);
+  
+  // NEW: Error states
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [discoverError, setDiscoverError] = useState<string | null>(null);
 
   // Read route params to toggle Discover and prefill search
   const params = useLocalSearchParams<{ discover?: string | string[]; search?: string | string[]; q?: string | string[] }>();
@@ -97,6 +105,7 @@ const Home = () => {
         fetchChats(),
         fetchUserChannels(),
         fetchSponsoredChannels(),
+        fetchDiscoverChannels(),
       ]);
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -116,11 +125,15 @@ const Home = () => {
   };
 
   const fetchDiscoverChannels = async () => {
-    if (discoverChannels.length > 0) return;
+    // Always fetch if we don't have data, or if we want to refresh. 
+    // Removing the early return allows retrying if it failed previously or if we want fresh data.
+    // However, to prevent spamming, we can check loading state.
+    if (loadingDiscover) return;
     
     setLoadingDiscover(true);
+    setDiscoverError(null); // Reset error
     try {
-      const response = await apiClient.get('/channel/recommended?limit=50');
+      const response = await apiClient.get('/channel/public?limit=50');
       const publicChannels = (response.data.channels || []).filter(
         (channel: any) => channel.isPublic !== false
       );
@@ -128,6 +141,7 @@ const Home = () => {
     } catch (error: any) {
       console.log('Discover channels not available:', error?.response?.status);
       setDiscoverChannels([]);
+      setDiscoverError('Failed to load discover channels. Please try again.'); // Set error
     } finally {
       setLoadingDiscover(false);
     }
@@ -144,7 +158,7 @@ const Home = () => {
       // If featured endpoint doesn't exist (404) or fails, try recommended channels
       if (error?.response?.status === 404 || true) {
         try {
-          const response = await apiClient.get('/channel/recommended?limit=2');
+          const response = await apiClient.get('/channel/public?limit=2');
           const publicChannels = (response.data.channels || []).filter(
             (channel: any) => channel.isPublic !== false
           );
@@ -162,21 +176,44 @@ const Home = () => {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    setSearchError(null); // Clear errors on refresh
+    setDiscoverError(null);
     await loadData();
     setRefreshing(false);
   }, []);
 
-  // Debounced search effect
+  // Debounce search input to limit network calls
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (searchQuery.trim()) {
-        performGlobalSearch(searchQuery.trim());
-      } else {
-        setGlobalSearchResults({ users: [], channels: [], communities: [], groups: [] });
-        setIsSearching(false);
-      }
+      setDebouncedSearchQuery(searchQuery.trim());
     }, 300);
+    return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  // Keep Discover active and URL in sync while typing
+  useEffect(() => {
+    if (searchQuery.trim().length > 0) {
+      setShowDiscover(true);
+
+      router.replace({
+        pathname: '/',
+        params: {
+          discover: '1',
+          q: searchQuery.trim(),
+        },
+      });
+    }
+  }, [searchQuery]);
+
+  // Trigger global search only when Discover is active and query is long enough
+  useEffect(() => {
+    if (!showDiscover || debouncedSearchQuery.length < 2) {
+      setGlobalSearchResults({ users: [], channels: [], communities: [], groups: [] });
+      setIsSearching(false);
+      return;
+    }
+    performGlobalSearch(debouncedSearchQuery);
+  }, [debouncedSearchQuery, showDiscover]);
 
   // Fetch discover channels when tab is switched
   useEffect(() => {
@@ -189,13 +226,41 @@ const Home = () => {
     if (!showDiscover) return;
     
     setIsSearching(true);
+    setSearchError(null); // Reset error
     try {
-      const response = await apiClient.get(`/search?q=${encodeURIComponent(query)}&limit=20`);
-      const { users = [], channels = [], communities = [], groups = [] } = response.data;
-      setGlobalSearchResults({ users, channels, communities, groups });
+      // Call multiple endpoints in parallel to get different types of results
+      const [usersRes, channelsRes, communitiesRes] = await Promise.allSettled([
+        apiClient.get(`/user?search=${encodeURIComponent(query)}&limit=10`),
+        apiClient.get(`/channel/public?search=${encodeURIComponent(query)}&limit=10`),
+        apiClient.get(`/community?search=${encodeURIComponent(query)}&limit=10`),
+      ]);
+
+      // Extract results from successful requests
+      const users = usersRes.status === 'fulfilled' ? (usersRes.value.data?.users || usersRes.value.data || []) : [];
+      const channels = channelsRes.status === 'fulfilled' ? (channelsRes.value.data?.channels || channelsRes.value.data || []) : [];
+      const communities = communitiesRes.status === 'fulfilled' ? (communitiesRes.value.data?.communities || communitiesRes.value.data || []) : [];
+      
+      // Filter out channels the user is already subscribed to
+      const filteredChannels = (channels || []).filter(
+        (ch: any) => !channels.some((userCh: any) => userCh._id === ch._id)
+      );
+
+      setGlobalSearchResults({
+        users: Array.isArray(users) ? users : [],
+        channels: Array.isArray(filteredChannels) ? filteredChannels : [],
+        communities: Array.isArray(communities) ? communities : [],
+        groups: [], // Groups are from local chats, not from global search
+      });
+      
+      // If all failed, set error
+      if (usersRes.status === 'rejected' && channelsRes.status === 'rejected' && communitiesRes.status === 'rejected') {
+        setSearchError('Failed to perform search. Please try again.');
+      }
+
     } catch (error: any) {
-      console.log('Global search not available:', error?.response?.status);
+      console.log('Global search error:', error?.message);
       setGlobalSearchResults({ users: [], channels: [], communities: [], groups: [] });
+      setSearchError('An unexpected error occurred during search.');
     } finally {
       setIsSearching(false);
     }
@@ -206,23 +271,49 @@ const Home = () => {
     try {
       await apiClient.post(`/channel/${channelId}/unsubscribe`);
       
+      // Remove from user's channels list (primary source of truth)
+      setChannels((prev) => prev.filter((ch) => ch._id !== channelId));
+      
       // Update discover channels list
       setDiscoverChannels((prev) =>
         prev.map((ch) => {
           if (ch._id === channelId) {
             return {
               ...ch,
-              participants: (ch.participants || []).filter((p: any) => (p._id || p) !== user?._id),
+              participants: (ch.participants || []).filter((p: any) => {
+                const participantId = typeof p === 'string' ? p : p?._id;
+                return participantId !== user?._id;
+              }),
               subscriberCount: Math.max((ch.subscriberCount || 0) - 1, 0),
             };
           }
           return ch;
         })
       );
-      
-      await fetchUserChannels();
     } catch (error: any) {
-      console.error('Failed to subscribe:', error);
+      // Handle already unsubscribed case (400 error)
+      if (error?.response?.status === 400) {
+        console.warn('Already unsubscribed from channel:', error?.response?.data?.message);
+        // Still update UI as user is not subscribed
+        setChannels((prev) => prev.filter((ch) => ch._id !== channelId));
+        setDiscoverChannels((prev) =>
+          prev.map((ch) => {
+            if (ch._id === channelId) {
+              return {
+                ...ch,
+                participants: (ch.participants || []).filter((p: any) => {
+                  const participantId = typeof p === 'string' ? p : p?._id;
+                  return participantId !== user?._id;
+                }),
+                subscriberCount: Math.max((ch.subscriberCount || 0) - 1, 0),
+              };
+            }
+            return ch;
+          })
+        );
+      } else {
+        console.error('Failed to unsubscribe:', error);
+      }
     } finally {
       setSubscribingChannels((prev) => {
         const next = new Set(prev);
@@ -235,9 +326,13 @@ const Home = () => {
   const handleSubscribeToChannel = async (channelId: string) => {
     setSubscribingChannels((prev) => new Set(prev).add(channelId));
     try {
-      await apiClient.post(`/channel/${channelId}/subscribe`);
+      const response = await apiClient.post(`/channel/${channelId}/subscribe`);
+      console.log('Subscribe response:', response.data);
       
-      // Update discover channels list
+      // Refresh user channels from backend to ensure sync
+      await fetchUserChannels();
+      
+      // Update discover channels list to show joined status
       setDiscoverChannels((prev) =>
         prev.map((ch) => {
           if (ch._id === channelId) {
@@ -250,10 +345,16 @@ const Home = () => {
           return ch;
         })
       );
-      
-      await fetchUserChannels();
     } catch (error: any) {
-      console.error('Failed to unsubscribe:', error);
+      console.error('Subscribe error:', error?.response?.data || error);
+      // Handle already subscribed case (400 error)
+      if (error?.response?.status === 400) {
+        console.warn('Already subscribed to channel:', error?.response?.data?.message);
+        // Refresh user channels to ensure sync
+        await fetchUserChannels();
+      } else {
+        console.error('Failed to subscribe:', error?.message);
+      }
     } finally {
       setSubscribingChannels((prev) => {
         const next = new Set(prev);
@@ -264,7 +365,20 @@ const Home = () => {
   };
 
   const isUserSubscribed = (channel: ChannelType): boolean => {
-    return channels.some((ch) => ch._id === channel._id);
+    // Check user's channels list first (primary source of truth)
+    if (channels.some((ch) => ch._id === channel._id)) {
+      return true;
+    }
+    
+    // Fallback: check participants array in channel data
+    // This handles cases where channel data might be stale
+    return (
+      Array.isArray(channel.participants) &&
+      channel.participants.some((p: any) => {
+        const participantId = typeof p === 'string' ? p : p?._id;
+        return participantId === user?._id;
+      })
+    );
   };
 
   // Filter items based on search query
@@ -314,72 +428,72 @@ const Home = () => {
 
   const combinedItems = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    const safeTime = (entry: any) => {
-      const ts = entry?.item?.lastMessage?.createdAt;
-      return ts ? new Date(ts).getTime() : 0;
-    };
-    
-    if (!q) {
-      const items = [
-        ...(chats || []).filter(Boolean).map((c) => ({ kind: 'chat' as const, item: c })),
-        ...(channels || []).filter(Boolean).map((c) => ({ kind: 'channel' as const, item: c })),
-      ].filter((entry) => entry?.item);
-      
-      return items.sort((a, b) => safeTime(b) - safeTime(a));
-    }
-    
-    const matchedUsers = (globalSearchResults.users || []).filter(Boolean).map((u: any) => ({
-      kind: 'user' as const,
-      item: u,
-    }));
-    const matchedChannels = (globalSearchResults.channels || []).filter(Boolean).map((c: any) => ({
+    if (!q) return [];
+
+    const cleanQuery = q.startsWith('@') ? q.slice(1) : q;
+
+    const channels = (globalSearchResults.channels || []).map((c) => ({
       kind: 'channel' as const,
       item: c,
     }));
-    const matchedCommunities = (globalSearchResults.communities || []).filter(Boolean).map((c: any) => ({
+
+    const groups = (globalSearchResults.groups || []).map((g) => ({
+      kind: 'chat' as const,
+      item: g,
+    }));
+
+    const communities = (globalSearchResults.communities || []).map((c) => ({
       kind: 'community' as const,
       item: c,
     }));
-    const matchedGroups = (globalSearchResults.groups || []).filter(Boolean).map((c: any) => ({
-      kind: 'chat' as const,
-      item: c,
-    }));
-    
-    const matchedPrivateChats = (chats || [])
+
+    const privateChats = (chats || [])
       .filter((chat) => {
         if (chat.type === 'GROUP') return false;
         const name = (chat.name || chat.participants?.[0]?.name || '').toLowerCase();
         const username = (chat.participants?.[0]?.username || '').toLowerCase();
-        const cleanQuery = q.startsWith('@') ? q.slice(1) : q;
         return name.includes(cleanQuery) || username.includes(cleanQuery);
       })
       .map((c) => ({ kind: 'chat' as const, item: c }));
-    
-    const merged = [
-      ...matchedUsers,
-      ...matchedChannels,
-      ...matchedCommunities,
-      ...matchedGroups,
-      ...matchedPrivateChats,
-    ].filter((entry) => entry?.item);
-    return merged.sort((a, b) => safeTime(b) - safeTime(a));
-  }, [chats, channels, searchQuery, globalSearchResults]);
+
+    const users = (globalSearchResults.users || []).map((u) => ({
+      kind: 'user' as const,
+      item: u,
+    }));
+
+    return [
+      ...channels,
+      ...groups,
+      ...communities,
+      ...privateChats,
+      ...users,
+    ].slice(0, 5);
+  }, [searchQuery, globalSearchResults, chats]);
 
   const styles = StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: colors.background,
-      paddingTop: insets.top,
     },
     header: {
       padding: 16,
-      paddingTop: 8,
+      paddingTop: 12,
+      paddingBottom: 12,
+      backgroundColor: colors.background,
+    },
+    headerContent: {
+      marginBottom: 0,
+    },
+    headerTop: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 14,
     },
     title: {
-      fontSize: 28,
-      fontWeight: '700',
+      fontSize: 32,
+      fontWeight: '800',
       color: colors.foreground,
-      marginBottom: 16,
     },
     searchContainer: {
       flexDirection: 'row',
@@ -388,9 +502,8 @@ const Home = () => {
       borderRadius: 12,
       paddingHorizontal: 12,
       paddingVertical: 10,
-      marginBottom: 16,
-      borderWidth: 1,
-      borderColor: colors.border,
+      marginBottom: 0,
+      borderWidth: 0,
     },
     searchInput: {
       flex: 1,
@@ -400,14 +513,19 @@ const Home = () => {
     },
     tabContainer: {
       flexDirection: 'row',
-      gap: 8,
-      marginBottom: 16,
+      gap: 12,
+      marginBottom: 0,
+      paddingHorizontal: 0,
+      backgroundColor: 'transparent',
     },
     tab: {
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      borderRadius: 12,
-      backgroundColor: colors.muted,
+      paddingHorizontal: 20,
+      paddingVertical: 8,
+      borderRadius: 20,
+      backgroundColor: colors.muted, // Default inactive background
+      borderWidth: 0,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     activeTab: {
       backgroundColor: colors.primary,
@@ -435,12 +553,11 @@ const Home = () => {
     sponsoredCard: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: `${colors.primary}15`,
-      borderRadius: 12,
-      padding: 12,
+      backgroundColor: colors.card,
+      borderRadius: 14,
+      padding: 14,
       marginBottom: 8,
-      borderWidth: 1,
-      borderColor: `${colors.primary}30`,
+      borderWidth: 0,
     },
     channelIcon: {
       width: 48,
@@ -487,21 +604,21 @@ const Home = () => {
       color: colors.mutedForeground,
     },
     listContainer: {
-      paddingHorizontal: 16,
+      paddingHorizontal: 20,
     },
     chatItem: {
       flexDirection: 'row',
       alignItems: 'center',
       backgroundColor: colors.card,
-      borderRadius: 12,
-      padding: 12,
+      borderRadius: 14,
+      padding: 14,
       marginBottom: 8,
     },
     avatar: {
       width: 48,
       height: 48,
       borderRadius: 12,
-      backgroundColor: colors.muted,
+      backgroundColor: `${colors.primary}20`,
       justifyContent: 'center',
       alignItems: 'center',
     },
@@ -550,13 +667,13 @@ const Home = () => {
       marginBottom: 4,
     },
     unreadBadge: {
-      minWidth: 20,
-      height: 20,
-      borderRadius: 10,
+      minWidth: 22,
+      height: 22,
+      borderRadius: 11,
       backgroundColor: colors.primary,
       justifyContent: 'center',
       alignItems: 'center',
-      paddingHorizontal: 6,
+      paddingHorizontal: 8,
     },
     unreadText: {
       fontSize: 11,
@@ -586,10 +703,21 @@ const Home = () => {
       padding: 8,
       marginLeft: 4,
     },
+    errorContainer: {
+      padding: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    errorText: {
+      color: 'red',
+      textAlign: 'center',
+      marginBottom: 10,
+    },
   });
 
-  const totalItems = showDiscover ? combinedItems.length : homeItems.length;
-  const displayItems = showDiscover ? combinedItems : homeItems;
+  const isDiscoverSearch = showDiscover && debouncedSearchQuery.length > 0;
+  const displayItems = showDiscover ? (isDiscoverSearch ? combinedItems : []) : homeItems;
+  const totalItems = displayItems.length;
 
   const renderChatItem = (entry: any) => {
     if (entry.kind === 'user') {
@@ -786,18 +914,27 @@ const Home = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Home</Text>
-
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <SearchIcon />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search communities, channels, and groups..."
-            placeholderTextColor={colors.mutedForeground}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
+        <View style={styles.headerContent}>
+          {/* Search Bar */}
+          <View style={styles.searchContainer}>
+            <Ionicons name="search" size={20} color={colors.mutedForeground} />
+            <TextInput
+              style={[styles.searchInput, { outlineStyle: 'none' } as any]}
+              placeholder="Search communities, channels, and groups..."
+              placeholderTextColor={colors.mutedForeground}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              selectionColor={colors.primary}
+              underlineColorAndroid="transparent"
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Ionicons name="close-circle" size={20} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            )}
+          </View>
+          <View style={{ marginLeft: 12 }}>
+          </View>
         </View>
 
         {/* Tab Toggle */}
@@ -824,12 +961,13 @@ const Home = () => {
       </View>
 
       <ScrollView
+        contentContainerStyle={{ paddingBottom: 110 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
         {/* Sponsored Channels - only show if we have channels */}
-        {sponsoredChannels.length > 0 && (
+        {/* commented out as requested */ false && sponsoredChannels.length > 0 && (
           <View style={styles.sponsoredSection}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
               <StarIcon />
@@ -899,58 +1037,123 @@ const Home = () => {
 
         {/* Content */}
         <View style={styles.listContainer}>
-          {isChatsLoading || loadingChannels || isSearching ? (
-            <View style={styles.loader}>
-              <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-          ) : totalItems === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={{ fontSize: 48 }}>
-                {searchQuery.trim() ? '🔍' : '💬'}
-              </Text>
-              <Text style={styles.emptyText}>
-                {searchQuery.trim()
-                  ? `No results found for "${searchQuery}"`
-                  : showDiscover
-                  ? 'No channels to discover yet'
-                  : 'No chats yet'}
-              </Text>
-              {searchQuery.trim() && (
-                <Text style={styles.emptySubtext}>
-                  Try searching with different keywords
+          {!showDiscover ? (
+            // Home tab: local chats + channels
+            isChatsLoading || loadingChannels ? (
+              <View style={styles.loader}>
+                <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+            ) : homeItems.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={{ fontSize: 48 }}>
+                  {searchQuery.trim() ? '🔍' : '💬'}
                 </Text>
-              )}
-            </View>
-          ) : (
-            displayItems.map(renderChatItem)
-          )}
-
-          {/* Recommended Channels in Discover Tab */}
-          {showDiscover &&
-            searchQuery.trim() &&
-            !isSearching &&
-            discoverChannels.length > 0 && (
-              <>
-                <Text style={[styles.sectionTitle, { marginTop: 24, marginBottom: 12 }]}>
-                  Recommended Channels
+                <Text style={styles.emptyText}>
+                  {searchQuery.trim()
+                    ? `No results found for "${searchQuery}"`
+                    : 'No chats yet'}
                 </Text>
-                {discoverChannels.slice(0, 5).map((channel) =>
-                  renderChatItem({ kind: 'channel', item: channel })
+                {searchQuery.trim() && (
+                  <Text style={styles.emptySubtext}>
+                    Try searching with different keywords
+                  </Text>
                 )}
+              </View>
+            ) : (
+              <>
+                <Text style={[styles.sectionTitle, { marginBottom: 12 }]}>Recent</Text>
+                {homeItems.map(renderChatItem)}
               </>
-            )}
-
-          {/* All Discover Channels */}
-          {showDiscover && !searchQuery.trim() && (
+            )
+          ) : (
+            // Discover tab
             <>
-              {loadingDiscover ? (
-                <View style={styles.loader}>
-                  <ActivityIndicator size="large" color={colors.primary} />
-                </View>
+              {isDiscoverSearch ? (
+                <>
+                  <Text style={[styles.sectionTitle, { marginBottom: 12 }]}>Search Results</Text>
+                  {isSearching ? (
+                    <View style={styles.loader}>
+                      <ActivityIndicator size="large" color={colors.primary} />
+                    </View>
+                  ) : searchError ? (
+                    <View style={styles.errorContainer}>
+                      <Text style={styles.errorText}>{searchError}</Text>
+                      <TouchableOpacity onPress={() => performGlobalSearch(debouncedSearchQuery)}>
+                         <Ionicons name="refresh" size={24} color={colors.primary} />
+                      </TouchableOpacity>
+                    </View>
+                  ) : totalItems === 0 ? (
+                    <View style={styles.emptyContainer}>
+                      <Text style={{ fontSize: 48 }}>🔍</Text>
+                      <Text style={styles.emptyText}>
+                        {`No results found for "${searchQuery}"`}
+                      </Text>
+                    </View>
+                  ) : (
+                    displayItems.map(renderChatItem)
+                  )}
+
+                  {discoverChannels.length > 0 && (
+                    <>
+                      <Text style={[styles.sectionTitle, { marginTop: 24 }]}> 
+                        Recommended Channels
+                      </Text>
+                      {discoverChannels.slice(0, 5).map((channel) =>
+                        renderChatItem({ kind: 'channel', item: channel })
+                      )}
+                    </>
+                  )}
+                </>
               ) : (
-                discoverChannels.map((channel) =>
-                  renderChatItem({ kind: 'channel', item: channel })
-                )
+                <>
+                  <Text style={[styles.sectionTitle, { marginBottom: 12 }]}>Discover Channels</Text>
+                  {loadingDiscover ? (
+                    <View style={styles.loader}>
+                      <ActivityIndicator size="large" color={colors.primary} />
+                    </View>
+                  ) : discoverError ? (
+                    <View style={styles.errorContainer}>
+                       <Text style={styles.errorText}>{discoverError}</Text>
+                       <TouchableOpacity onPress={fetchDiscoverChannels}>
+                          <Text style={{ color: colors.primary }}>Try Again</Text>
+                       </TouchableOpacity>
+                    </View>
+                  ) : discoverChannels.length === 0 ? (
+                    <View style={[styles.emptyContainer, { paddingHorizontal: 16 }]}>
+                      <View style={{
+                        width: '100%',
+                        backgroundColor: colors.card,
+                        borderRadius: 14,
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        padding: 20,
+                        alignItems: 'center',
+                      }}>
+                        <Text style={{ fontSize: 48 }}>📢</Text>
+                        <Text style={styles.emptyText}>No channels to discover yet</Text>
+                        <Text style={styles.emptySubtext}>Pull to refresh or try again later</Text>
+                        <TouchableOpacity
+                          onPress={onRefresh}
+                          style={{
+                            marginTop: 16,
+                            paddingHorizontal: 16,
+                            paddingVertical: 10,
+                            borderRadius: 10,
+                            borderWidth: 1,
+                            borderColor: colors.border,
+                            backgroundColor: colors.card,
+                          }}
+                        >
+                          <Text style={{ color: colors.foreground, fontWeight: '600' }}>Refresh</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : (
+                    discoverChannels.map((channel) =>
+                      renderChatItem({ kind: 'channel', item: channel })
+                    )
+                  )}
+                </>
               )}
             </>
           )}

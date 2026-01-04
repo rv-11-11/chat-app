@@ -4,6 +4,7 @@ import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity,
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import "../../global.css";
 import GroupCreateModal from '../../src/components/GroupCreateModal';
+import NotificationDropdown from '../../src/components/NotificationDropdown';
 import { chatApi } from '../../src/services/api/chat';
 import { useAuthStore } from '../../src/store/authStore';
 import { useChatStore } from '../../src/store/chatStore';
@@ -274,9 +275,12 @@ export default function GroupListScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Groups</Text>
-        <TouchableOpacity style={styles.newButton} onPress={() => setIsCreateOpen(true)}>
-          <Text style={styles.newButtonText}>+ New</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <NotificationDropdown />
+          <TouchableOpacity style={styles.newButton} onPress={() => setIsCreateOpen(true)}>
+            <Text style={styles.newButtonText}>+ New</Text>
+          </TouchableOpacity>
+        </View>
       </View>
       <View style={styles.searchBar}>
         <TextInput

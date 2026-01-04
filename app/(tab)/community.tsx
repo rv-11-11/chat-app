@@ -396,12 +396,14 @@ const Community = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Communities</Text>
-        <TouchableOpacity style={styles.newButton} onPress={() => setIsCreateOpen(true)}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Ionicons name="add" size={18} color={colors.primaryForeground} />
-            <Text style={styles.newButtonText}>New</Text>
-          </View>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <TouchableOpacity style={styles.newButton} onPress={() => setIsCreateOpen(true)}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Ionicons name="add" size={18} color={colors.primaryForeground} />
+              <Text style={styles.newButtonText}>New</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.tabs}>

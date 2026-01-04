@@ -66,6 +66,16 @@ const DrawerRoot = () => {
           }}
         />
         <Drawer.Screen
+          name="invites"
+          options={{
+            drawerLabel: 'Pending Invites',
+            title: 'Pending Invites',
+            drawerIcon: ({ color, size }) => (
+              <FontAwesome name="envelope-o" size={size} color={color} />
+            ),
+          }}
+        />
+        <Drawer.Screen
           name="setting"
           options={{
             drawerLabel: 'Settings',
