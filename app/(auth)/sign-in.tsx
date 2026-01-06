@@ -5,16 +5,13 @@ import { useAuthStore } from '../../src/store/authStore';
 import { useThemeColors } from '../../src/utils/theme';
 import type { LoginData } from '../../src/types/auth.types';
 import { Ionicons } from '@expo/vector-icons';
-import * as WebBrowser from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
-import Constants from 'expo-constants';
-
-WebBrowser.maybeCompleteAuthSession();
+import { makeRedirectUri } from 'expo-auth-session';
+import { supabase, openAuthSessionAsync, getSessionFromUrl } from '../../src/services/supabase';
 
 export default function SignInScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { login, googleLogin, isLoggingIn } = useAuthStore();
+  const { login, isLoggingIn } = useAuthStore();
   const router = useRouter();
   const colors = useThemeColors();
 
@@ -42,39 +39,110 @@ export default function SignInScreen() {
     return () => pulse.stop();
   }, [pulseAnim]);
 
-  const extras = (Constants.expoConfig && (Constants.expoConfig as any).extra) || (Constants.manifest && (Constants.manifest as any).extra) || {};
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    androidClientId: extras.googleAndroidClientId || extras.googleAndroidClientId || '',
-    iosClientId: extras.googleIosClientId || extras.googleIosClientId || '',
-    webClientId: extras.googleWebClientId || extras.googleWebClientId || '',
-  });
-
+  // If redirected back to web after Supabase OAuth, try to extract and persist session
   useEffect(() => {
-    if (response?.type === 'success') {
-      const { authentication } = response;
-      fetchUserInfo(authentication?.accessToken);
-    } else if (response?.type === 'error') {
-      Alert.alert('Sign in failed', 'Google sign in encountered an error');
-    }
-  }, [response]);
+    (async () => {
+      try {
+        const res = await getSessionFromUrl();
+        if (res && (res as any).data?.session) {
+          router.replace('/(tab)');
+        }
+      } catch {
+        // ignore
+      }
+    })();
+  }, [router]);
 
-  const fetchUserInfo = async (token: string | undefined) => {
-    if (!token) return;
+  // Use Supabase's callback URL for OAuth provider, then redirect to app
+  const redirectUri = makeRedirectUri({ scheme: 'linkiplay', path: 'auth/callback' });
+
+  const handleGoogle = async () => {
     try {
-      const res = await fetch('https://www.googleapis.com/userinfo/v2/me', {
-        headers: { Authorization: `Bearer ${token}` },
+      // Initiate Supabase OAuth flow. This will open a browser session.
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUri,
+          // WebBrowser will handle the session; supabase client is configured to not detect session in url
+        },
       });
-      const user = await res.json();
-      await googleLogin({
-        email: user.email,
-        name: user.name,
-        googleId: user.id,
-        avatar: user.picture,
-      });
-      router.replace('/(tab)');
-    } catch (error: any) {
-      console.error(error);
-      Alert.alert('Google Sign-In Failed', error?.message || 'Could not fetch user info');
+
+      if (error) {
+        Alert.alert('Sign in failed', error.message || 'Google sign in encountered an error');
+        return;
+      }
+
+      // data will include url to open for the OAuth flow on some platforms
+      if ((data as any)?.url) {
+        const result = await openAuthSessionAsync((data as any).url, redirectUri);
+        
+        // Check if the auth session completed successfully
+        if (result.type === 'success' && result.url) {
+          try {
+            // Parse the URL to extract tokens
+            // The URL might be in format: linkiplay://#access_token=...&refresh_token=...
+            let accessToken: string | null = null;
+            let refreshToken: string | null = null;
+            
+            // Try to parse as URL (works for http/https URLs)
+            try {
+              const url = new URL(result.url);
+              accessToken = url.searchParams.get('access_token') || url.hash.match(/access_token=([^&]+)/)?.[1] || null;
+              refreshToken = url.searchParams.get('refresh_token') || url.hash.match(/refresh_token=([^&]+)/)?.[1] || null;
+            } catch {
+              // If URL parsing fails (e.g., custom scheme), parse manually
+              const hashMatch = result.url.match(/#(.+)/);
+              if (hashMatch) {
+                const params = new URLSearchParams(hashMatch[1]);
+                accessToken = params.get('access_token');
+                refreshToken = params.get('refresh_token');
+              } else {
+                // Try to extract from the full URL string
+                const accessMatch = result.url.match(/access_token=([^&]+)/);
+                const refreshMatch = result.url.match(/refresh_token=([^&]+)/);
+                accessToken = accessMatch ? accessMatch[1] : null;
+                refreshToken = refreshMatch ? refreshMatch[1] : null;
+              }
+            }
+            
+            if (accessToken) {
+              // Set the session manually
+              try {
+                await (supabase.auth as any).setSession({
+                  access_token: accessToken,
+                  refresh_token: refreshToken || undefined,
+                });
+              } catch (sessionError) {
+                console.log('[Supabase] Error setting session from redirect:', sessionError);
+              }
+            }
+            
+            // Wait a moment for the session to be processed
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Check if we have a session now
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+              // Navigation will happen via the auth state listener in root layout
+              router.replace('/(tab)');
+            }
+          } catch (parseError) {
+            console.log('[OAuth] Error parsing redirect URL:', parseError);
+            // Still try to get session - Supabase might have processed it
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+              router.replace('/(tab)');
+            }
+          }
+        } else if (result.type === 'cancel') {
+          // User cancelled the OAuth flow
+          console.log('OAuth cancelled by user');
+        }
+      }
+      // Supabase listener in root layout will update auth state when complete
+    } catch (e: any) {
+      Alert.alert('Sign in failed', e?.message || 'Google sign in encountered an error');
     }
   };
 
@@ -304,11 +372,11 @@ export default function SignInScreen() {
             <View style={styles.divider} />
           </View>
 
-          <TouchableOpacity 
-              style={styles.googleButton} 
-              onPress={() => promptAsync()}
-              disabled={!request || isLoggingIn}
-          >
+      <TouchableOpacity 
+        style={styles.googleButton} 
+        onPress={handleGoogle}
+        disabled={isLoggingIn}
+      >
               <Ionicons name="logo-google" size={24} color={colors.foreground} />
               <Text style={styles.googleButtonText}>Sign in with Google</Text>
           </TouchableOpacity>

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { supabase } from '../services/supabase';
 import { authApi } from '../services/api/auth';
 import { channelApi } from '../services/api/channel';
 import { chatApi } from '../services/api/chat';
@@ -136,7 +137,10 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logout: async () => {
     try {
+      // Inform backend
       await authApi.logout();
+      // Sign out from Supabase to clear stored session
+      try { await supabase.auth.signOut(); } catch (e) {}
       set({ user: null });
       await clearAuth();
       await secureStorage.remove('authToken').catch(() => {});

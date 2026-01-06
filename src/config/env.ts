@@ -6,8 +6,8 @@ const getEnvVar = (key: string, defaultValue?: string): string => {
 };
 
 export const ENV = {
-  API_URL: getEnvVar('apiUrl', 'http://localhost:8000'),
-  SOCKET_URL: getEnvVar('socketUrl', 'http://localhost:8000'),
+  API_URL: getEnvVar('apiUrl', 'https://chat-app-qwrr.onrender.com'),
+  SOCKET_URL: getEnvVar('socketUrl', 'https://chat-app-qwrr.onrender.com'),
   CLOUDINARY_CLOUD_NAME: getEnvVar('CLOUDINARY_CLOUD_NAME', 'dy8qfihsz'),
   CLOUDINARY_API_KEY: getEnvVar('CLOUDINARY_API_KEY', '842725345293151'),
   NODE_ENV: getEnvVar('NODE_ENV', 'development'),

@@ -1,8 +1,16 @@
 import { useEffect, useState, useRef } from 'react';
+import { Platform } from 'react-native';
+
+// Load URL polyfill on native (non-web) runtimes only
+if (Platform.OS !== 'web') {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  require('react-native-url-polyfill/auto');
+}
 import { Stack } from 'expo-router';
 import { View, Image, Animated, StyleSheet, Dimensions } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAuthStore } from '../src/store/authStore';
+import { initSupabaseAuthListener } from '../src/services/supabase';
 import { useSocketStore } from '../src/store/socketStore';
 import { useSidebarStore } from '../src/store/sidebarStore';
 import { useThemeStore } from '../src/store/themeStore';
@@ -38,9 +46,43 @@ export default function RootLayout() {
 
     // Check auth status (will restore persisted user if valid)
     checkAuthStatus();
-    
+
+    // Initialize Supabase auth listener to keep global auth state in sync
+    const subscription = initSupabaseAuthListener(async (event, session) => {
+      console.log('[Supabase] auth event', event, !!session);
+      if (session?.user) {
+        // Try to authenticate with backend using Google info so backend returns app token
+        const meta = session.user.user_metadata || {};
+        const email = session.user.email || meta.email || '';
+        const name = meta.full_name || meta.name || '';
+        const googleId = meta.sub || meta.provider_id || session.user.id;
+        const avatar = meta.avatar_url || meta.picture || meta.avatar || '';
+
+        try {
+          // Call existing store action which posts to backend and persists app token
+          console.log('[Supabase] calling backend googleLogin', email, googleId);
+          const res = await useAuthStore.getState().googleLogin({ email, name, googleId, avatar });
+          console.log('[Backend] googleLogin response', res);
+        } catch {
+          console.log('[Backend] googleLogin failed, setting minimal user');
+          // If backend login fails, still set a minimal user so UI can update
+          useAuthStore.getState().setUser({ _id: session.user.id, email, name, avatar } as any);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        useAuthStore.getState().setUser(null);
+      }
+    });
+
+    return () => {
+      // clean up listener
+      try { (subscription as any)?.data?.subscription?.unsubscribe(); } catch { }
+    };
+  }, [checkAuthStatus, loadTheme, loadSettings]);
+
+  // Animation and app ready timer separated to avoid unreachable code in previous effect
+  useEffect(() => {
     // Start pulse animation
-    Animated.loop(
+    const pulse = Animated.loop(
       Animated.sequence([
         Animated.timing(scaleAnim, {
           toValue: 1,
@@ -53,15 +95,17 @@ export default function RootLayout() {
           useNativeDriver: true,
         }),
       ])
-    ).start();
+    );
+    pulse.start();
 
     // Simulate minimum loading time for better UX
-    const timer = setTimeout(() => {
-      setIsAppReady(true);
-    }, 2000);
+    const timer = setTimeout(() => setIsAppReady(true), 2000);
 
-    return () => clearTimeout(timer);
-  }, [checkAuthStatus, loadTheme, loadSettings]);
+    return () => {
+      pulse.stop();
+      clearTimeout(timer);
+    };
+  }, [scaleAnim]);
 
   useEffect(() => {
     // Connect socket if user is authenticated
@@ -81,7 +125,7 @@ export default function RootLayout() {
         useNativeDriver: true,
       }).start();
     }
-  }, [isCheckingAuth, isAppReady]);
+  }, [isCheckingAuth, isAppReady, fadeAnim]);
 
   // Show loading screen while checking auth or minimum wait time
   if (isCheckingAuth || !isAppReady) {

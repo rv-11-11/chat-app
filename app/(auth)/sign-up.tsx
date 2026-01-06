@@ -3,12 +3,11 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityInd
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '../../src/store/authStore';
 import { useThemeColors } from '../../src/utils/theme';
-import * as WebBrowser from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
+import { makeRedirectUri } from 'expo-auth-session';
+import { supabase, openAuthSessionAsync, getSessionFromUrl } from '../../src/services/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-WebBrowser.maybeCompleteAuthSession();
 
 export default function SignUpScreen() {
   const [name, setName] = useState('');
@@ -19,7 +18,7 @@ export default function SignUpScreen() {
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   
-  const { register, googleLogin, isSigningUp, isLoggingIn } = useAuthStore();
+  const { register, isSigningUp, isLoggingIn } = useAuthStore();
   const router = useRouter();
   const colors = useThemeColors();
 
@@ -47,38 +46,39 @@ export default function SignUpScreen() {
     return () => pulse.stop();
   }, [pulseAnim]);
 
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    androidClientId: ENV.GOOGLE_ANDROID_CLIENT_ID,
-    iosClientId: ENV.GOOGLE_IOS_CLIENT_ID,
-    webClientId: ENV.GOOGLE_WEB_CLIENT_ID,
-  });
-
+  // If redirected back to web after Supabase OAuth, try to extract and persist session
   useEffect(() => {
-    if (response?.type === 'success') {
-      const { authentication } = response;
-      fetchUserInfo(authentication?.accessToken);
-    } else if (response?.type === 'error') {
-      Alert.alert('Sign in failed', 'Google sign in encountered an error');
-    }
-  }, [response]);
+    (async () => {
+      try {
+        const res = await getSessionFromUrl();
+        if (res && (res as any).data?.session) {
+          router.replace('/(tab)');
+        }
+      } catch {
+        // ignore
+      }
+    })();
+  }, [router]);
 
-  const fetchUserInfo = async (token: string | undefined) => {
-    if (!token) return;
+  const redirectUri = makeRedirectUri({ scheme: 'linkiplay' });
+
+  const handleGoogle = async () => {
     try {
-      const res = await fetch('https://www.googleapis.com/userinfo/v2/me', {
-        headers: { Authorization: `Bearer ${token}` },
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: redirectUri },
       });
-      const user = await res.json();
-      await googleLogin({
-        email: user.email,
-        name: user.name,
-        googleId: user.id,
-        avatar: user.picture,
-      });
-      router.replace('/(tab)');
-    } catch (error: any) {
-      console.error(error);
-      Alert.alert('Google Sign-In Failed', error?.message || 'Could not fetch user info');
+
+      if (error) {
+        Alert.alert('Sign in failed', error.message || 'Google sign in encountered an error');
+        return;
+      }
+
+      if ((data as any)?.url) {
+        await openAuthSessionAsync((data as any).url, redirectUri);
+      }
+    } catch (e: any) {
+      Alert.alert('Sign in failed', e?.message || 'Google sign in encountered an error');
     }
   };
 
@@ -317,11 +317,11 @@ export default function SignUpScreen() {
                 <View style={styles.dividerLine} />
             </View>
 
-            <TouchableOpacity 
-                style={styles.googleButton} 
-                onPress={() => promptAsync()}
-                disabled={!request || isSigningUp || isLoggingIn}
-            >
+      <TouchableOpacity 
+        style={styles.googleButton} 
+        onPress={handleGoogle}
+        disabled={isSigningUp || isLoggingIn}
+      >
                 <Ionicons name="logo-google" size={24} color={colors.foreground} />
                 <Text style={styles.googleButtonText}>Sign up with Google</Text>
             </TouchableOpacity>
