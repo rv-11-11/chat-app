@@ -13,6 +13,7 @@ import { channelApi } from '../../src/services/api/channel';
 import { userApi } from '../../src/services/api/user';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import CommunitySettingsModal from '../../src/components/CommunitySettingsModal';
+import { ENV } from '../../src/config/env';
 
 export default function CommunityDetailScreen() {
   const insets = useSafeAreaInsets();
@@ -733,7 +734,7 @@ export default function CommunityDetailScreen() {
         return;
       }
       const username = currentCommunity!.username || (communityId as string);
-      const link = `${process.env.EXPO_PUBLIC_WEB_URL || 'https://example.com'}/join/${username}`;
+      const link = `${ENV.API_URL}/join/${username}`;
       await Share.share({ message: `Join ${currentCommunity!.name}: ${link}`, url: link });
     } catch (error) {
       Alert.alert('Error', 'Unable to share invite link');
