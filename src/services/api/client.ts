@@ -2,6 +2,9 @@ import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { ENV } from '../../config/env';
 import { secureStorage } from '../storage/secureStore';
 
+// Log the API base URL on initialization
+console.log('[API Client] Initializing with baseURL:', `${ENV.API_URL}/api`);
+
 export const apiClient: AxiosInstance = axios.create({
   baseURL: `${ENV.API_URL}/api`,
   withCredentials: true, // keep for web compatibility

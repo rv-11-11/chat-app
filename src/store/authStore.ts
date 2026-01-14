@@ -63,7 +63,7 @@ interface AuthState {
   // Actions
   register: (data: RegisterData) => Promise<void>;
   login: (data: LoginData) => Promise<void>;
-  googleLogin: (data: GoogleLoginData) => Promise<void>;
+  googleLogin: (data: GoogleLoginData) => Promise<any>;
   logout: () => Promise<void>;
   checkAuthStatus: () => Promise<void>;
   setUser: (user: User | null) => void;
@@ -107,8 +107,8 @@ export const useAuthStore = create<AuthState>((set) => ({
       if ((response as any).token) {
         await secureStorage.set('authToken', (response as any).token).catch(() => {});
       }
-      try { connectSocket(); } catch (e) {}
-      try { await processPendingInvite(); } catch (e) {}
+  try { connectSocket(); } catch { }
+  try { await processPendingInvite(); } catch { }
       // Socket will be connected via useEffect in root layout
     } catch (error: any) {
       throw error;
@@ -126,8 +126,9 @@ export const useAuthStore = create<AuthState>((set) => ({
       if ((response as any).token) {
         await secureStorage.set('authToken', (response as any).token).catch(() => {});
       }
-      try { connectSocket(); } catch (e) {}
-      try { await processPendingInvite(); } catch (e) {}
+  try { connectSocket(); } catch { }
+  try { await processPendingInvite(); } catch { }
+      return response;
     } catch (error: any) {
       throw error;
     } finally {
@@ -161,8 +162,8 @@ export const useAuthStore = create<AuthState>((set) => ({
       if ((response as any).token) {
         await secureStorage.set('authToken', (response as any).token).catch(() => {});
       }
-      try { connectSocket(); } catch (e) {}
-      try { await processPendingInvite(); } catch (e) {}
+  try { connectSocket(); } catch { }
+  try { await processPendingInvite(); } catch { }
       // Socket will be connected via useEffect in root layout
     } catch (error) {
       // If auth status check fails, try to use persisted auth

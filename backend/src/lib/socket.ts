@@ -13,9 +13,59 @@ let io: Server | null = null;
 const onlineUsers = new Map<string, string>();
 
 export const initializeSocket = (httpServer: HTTPServer) => {
+  // Build allowed origins for socket (same as HTTP CORS)
+  const allowedOrigins: (string | RegExp)[] = [
+    Env.FRONTEND_ORIGIN,
+    // Render frontend URL (if deployed separately)
+    'https://chat-app-qwrr.onrender.com', // Render backend URL (for same-origin requests)
+    // Allow localhost for development (web frontend)
+    'http://localhost:8081',
+    'http://localhost:19006',
+    'http://127.0.0.1:8081',
+    'http://127.0.0.1:19006',
+    // Allow any localhost port for Expo web (development only)
+    ...(Env.NODE_ENV === 'development' ? [
+      /^http:\/\/localhost:\d+$/,
+      /^http:\/\/127\.0\.0\.1:\d+$/,
+    ] : []),
+  ];
+
   io = new Server(httpServer, {
     cors: {
-      origin: Env.FRONTEND_ORIGIN,
+      origin: (origin, callback) => {
+        // Allow requests without origin (mobile apps)
+        if (!origin) {
+          console.log('[Socket CORS] Allowing connection without origin (mobile app)');
+          return callback(null, true);
+        }
+        
+        // Check exact matches
+        if (allowedOrigins.includes(origin)) {
+          console.log('[Socket CORS] Allowing origin:', origin);
+          return callback(null, true);
+        }
+        
+        // Check regex patterns in development
+        if (Env.NODE_ENV === 'development') {
+          for (const pattern of allowedOrigins) {
+            if (pattern instanceof RegExp && pattern.test(origin)) {
+              console.log('[Socket CORS] Allowing origin (regex match):', origin);
+              return callback(null, true);
+            }
+          }
+        }
+        
+        // In production, be more permissive for Render deployments
+        // Allow any HTTPS origin from render.com subdomain
+        if (Env.NODE_ENV === 'production' && origin.includes('render.com')) {
+          console.log('[Socket CORS] Allowing Render origin:', origin);
+          return callback(null, true);
+        }
+        
+        console.warn('[Socket CORS] Blocked origin:', origin);
+        console.log('[Socket CORS] Allowed origins:', allowedOrigins.filter(o => typeof o === 'string'));
+        return callback(new Error(`Not allowed by Socket CORS: ${origin}`));
+      },
       methods: ["GET", "POST"],
       credentials: true,
     },

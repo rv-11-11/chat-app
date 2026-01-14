@@ -13,8 +13,10 @@ export const authApi = {
   },
 
   googleLogin: async (data: GoogleLoginData): Promise<AuthResponse> => {
-    const response = await apiClient.post<AuthResponse>('/auth/google', data);
-    return response.data;
+  console.log('[Client] googleLogin payload', data);
+  const response = await apiClient.post<AuthResponse>('/auth/google', data);
+  console.log('[Client] googleLogin response', response.data?.user?._id);
+  return response.data;
   },
 
   logout: async (): Promise<{ message: string }> => {

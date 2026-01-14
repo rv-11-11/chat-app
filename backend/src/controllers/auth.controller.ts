@@ -39,7 +39,8 @@ export const loginController = asyncHandler(
 
 export const googleLoginController = asyncHandler(
   async (req: Request, res: Response) => {
-    const body = googleLoginSchema.parse(req.body);
+  const body = googleLoginSchema.parse(req.body);
+  console.log('[Backend] /auth/google payload', body);
 
     const user = await googleLoginService(body);
     const userId = user._id as string;

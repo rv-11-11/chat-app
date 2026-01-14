@@ -4,7 +4,9 @@ import { useRouter } from 'expo-router';
 import { useAuthStore } from '../../src/store/authStore';
 import { useThemeColors } from '../../src/utils/theme';
 import { makeRedirectUri } from 'expo-auth-session';
+import Constants from 'expo-constants';
 import { supabase, openAuthSessionAsync, getSessionFromUrl } from '../../src/services/supabase';
+import { Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -60,13 +62,24 @@ export default function SignUpScreen() {
     })();
   }, [router]);
 
-  const redirectUri = makeRedirectUri({ scheme: 'linkiplay' });
+  const redirectUri = makeRedirectUri({ scheme: 'linkiplay', path: 'auth/callback' });
+  console.log('[Auth] redirectUri (sign-up)', redirectUri);
 
   const handleGoogle = async () => {
+    // Warn if running inside Expo Go — OAuth with custom schemes won't return to the app
+    try {
+      if ((Constants as any).appOwnership === 'expo') {
+        Alert.alert(
+          'Expo Go Detected',
+          'Google Sign-in requires a development build or standalone app. Please build a dev-client or an APK/emulator build (see docs) before using Google Sign-in.'
+        );
+        return;
+      }
+    } catch {}
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: redirectUri },
+        options: { redirectTo: redirectUri, scopes: 'openid email profile' },
       });
 
       if (error) {
@@ -74,7 +87,9 @@ export default function SignUpScreen() {
         return;
       }
 
+      console.log('[Auth] signInWithOAuth result', { data, error });
       if ((data as any)?.url) {
+        console.log('[Auth] opening auth url', (data as any).url, 'redirectUri', redirectUri);
         await openAuthSessionAsync((data as any).url, redirectUri);
       }
     } catch (e: any) {
@@ -243,6 +258,15 @@ export default function SignUpScreen() {
       color: colors.primary,
       fontWeight: 'bold',
     },
+    smallButton: {
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderRadius: 8,
+    },
+    smallButtonText: {
+      fontWeight: '600',
+      fontSize: 13,
+    },
   });
 
   return (
@@ -324,6 +348,14 @@ export default function SignUpScreen() {
       >
                 <Ionicons name="logo-google" size={24} color={colors.foreground} />
                 <Text style={styles.googleButtonText}>Sign up with Google</Text>
+            </TouchableOpacity>
+
+            <Text style={{ marginTop: 8, color: colors.mutedForeground, fontSize: 12 }}>Redirect URI: {redirectUri}</Text>
+
+            <TouchableOpacity style={[styles.smallButton, { marginTop: 10 }]} onPress={async () => {
+              try { await Linking.openURL(redirectUri); } catch (e) { Alert.alert('Open Link Failed', String(e)); }
+            }}>
+              <Text style={[styles.smallButtonText, { color: colors.primary }]}>Test deep link (open app)</Text>
             </TouchableOpacity>
 
             <View style={styles.footer}>

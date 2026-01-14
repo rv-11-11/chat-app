@@ -15,7 +15,7 @@
     },
     "android": {
       "package": "com.linkiplay.messenger",
-      "versionCode": 2,
+      "versionCode": 3,
       "permissions": [
         "INTERNET",
         "ACCESS_NETWORK_STATE",
@@ -68,7 +68,7 @@
       "socketUrl": "https://chat-app-qwrr.onrender.com",
   "EXPO_PUBLIC_SUPABASE_URL": "https://elcfjdfiiucahgmwtibh.supabase.co",
   "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsY2ZqZGZpaXVjYWhnbXd0aWJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc1MjMzMzYsImV4cCI6MjA4MzA5OTMzNn0.HIdfaqTfWoIxC0_f4b6Kecd9h1t6E9MnAdkj4MNtAPA",
-      "privacyPolicyUrl": "https://chat-app-qwrr.onrender.com/api/legal/privacy",
+      "privacyPolicyUrl": "https://yourdomain.com/privacy",
       "googleWebClientId": "170631155124-jt38kvf290u2pa6dht834bmblv527tsq.apps.googleusercontent.com",
       "googleIosClientId": "YOUR_IOS_CLIENT_ID.apps.googleusercontent.com",
       "googleAndroidClientId": "170631155124-38er02pg8ve6ar9ts6h2u0udhk3hgek3.apps.googleusercontent.com",

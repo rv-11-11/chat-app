@@ -547,8 +547,6 @@ const Home = () => {
       fontWeight: '600',
       color: colors.mutedForeground,
       marginBottom: 12,
-      flexDirection: 'row',
-      alignItems: 'center',
     },
     sponsoredCard: {
       flexDirection: 'row',
