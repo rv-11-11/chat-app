@@ -40,6 +40,7 @@ yarn-error.*
 .env.local
 .env.*.local
 .env.production
+keystore.properties
 
 # TypeScript
 *.tsbuildinfo

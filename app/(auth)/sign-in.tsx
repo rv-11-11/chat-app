@@ -1,11 +1,13 @@
 import { useRouter } from 'expo-router';
 import { useState, useRef, useEffect } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity, View, ScrollView, SafeAreaView, Animated, Easing } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity, View, ScrollView, SafeAreaView, Animated, Easing, Platform } from 'react-native';
 import { useAuthStore } from '../../src/store/authStore';
 import { useThemeColors } from '../../src/utils/theme';
 import type { LoginData } from '../../src/types/auth.types';
 import { Ionicons } from '@expo/vector-icons';
 import { makeRedirectUri } from 'expo-auth-session';
+import { Linking } from 'react-native';
+import Constants from 'expo-constants';
 import { supabase, openAuthSessionAsync, getSessionFromUrl } from '../../src/services/supabase';
 
 export default function SignInScreen() {
@@ -51,19 +53,44 @@ export default function SignInScreen() {
         // ignore
       }
     })();
+
+    // Add listener for deep links while on sign-in screen, in case callback route fails to mount
+    const handleUrl = (event: { url: string }) => {
+      console.log('[SignIn] Deep link received:', event.url);
+      if (event.url.includes('access_token') || event.url.includes('refresh_token')) {
+        // If we receive a token here, it means the callback route might have been bypassed
+        // or we are still on sign-in. Let's try to let the router handle it, or manually process.
+        // For now, we just log it. The AuthCallback component should handle it if routed correctly.
+      }
+    };
+    const sub = Linking.addEventListener('url', handleUrl);
+    return () => sub.remove();
   }, [router]);
 
-  // Use Supabase's callback URL for OAuth provider, then redirect to app
-  const redirectUri = makeRedirectUri({ scheme: 'linkiplay', path: 'auth/callback' });
+  const isWeb = Platform.OS === 'web';
+  const redirectUri = isWeb
+    ? `${window.location.origin}/auth/callback`
+    : makeRedirectUri({ scheme: 'linkiplay', path: 'auth/callback' });
+  console.log('[Auth] redirectUri (sign-in)', redirectUri);
 
   const handleGoogle = async () => {
+    // Warn if running inside Expo Go — OAuth with custom schemes won't return to the app
+    try {
+      if ((Constants as any).appOwnership === 'expo') {
+        Alert.alert(
+          'Expo Go Detected',
+          'Google Sign-in requires a development build or standalone app. Please build a dev-client or an APK/emulator build (see docs) before using Google Sign-in.'
+        );
+        return;
+      }
+    } catch {}
     try {
       // Initiate Supabase OAuth flow. This will open a browser session.
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: redirectUri,
-          // WebBrowser will handle the session; supabase client is configured to not detect session in url
+          scopes: 'openid email profile',
         },
       });
 
@@ -73,72 +100,10 @@ export default function SignInScreen() {
       }
 
       // data will include url to open for the OAuth flow on some platforms
+      console.log('[Auth] signInWithOAuth result', { data, error });
       if ((data as any)?.url) {
-        const result = await openAuthSessionAsync((data as any).url, redirectUri);
-        
-        // Check if the auth session completed successfully
-        if (result.type === 'success' && result.url) {
-          try {
-            // Parse the URL to extract tokens
-            // The URL might be in format: linkiplay://#access_token=...&refresh_token=...
-            let accessToken: string | null = null;
-            let refreshToken: string | null = null;
-            
-            // Try to parse as URL (works for http/https URLs)
-            try {
-              const url = new URL(result.url);
-              accessToken = url.searchParams.get('access_token') || url.hash.match(/access_token=([^&]+)/)?.[1] || null;
-              refreshToken = url.searchParams.get('refresh_token') || url.hash.match(/refresh_token=([^&]+)/)?.[1] || null;
-            } catch {
-              // If URL parsing fails (e.g., custom scheme), parse manually
-              const hashMatch = result.url.match(/#(.+)/);
-              if (hashMatch) {
-                const params = new URLSearchParams(hashMatch[1]);
-                accessToken = params.get('access_token');
-                refreshToken = params.get('refresh_token');
-              } else {
-                // Try to extract from the full URL string
-                const accessMatch = result.url.match(/access_token=([^&]+)/);
-                const refreshMatch = result.url.match(/refresh_token=([^&]+)/);
-                accessToken = accessMatch ? accessMatch[1] : null;
-                refreshToken = refreshMatch ? refreshMatch[1] : null;
-              }
-            }
-            
-            if (accessToken) {
-              // Set the session manually
-              try {
-                await (supabase.auth as any).setSession({
-                  access_token: accessToken,
-                  refresh_token: refreshToken || undefined,
-                });
-              } catch (sessionError) {
-                console.log('[Supabase] Error setting session from redirect:', sessionError);
-              }
-            }
-            
-            // Wait a moment for the session to be processed
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            // Check if we have a session now
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-              // Navigation will happen via the auth state listener in root layout
-              router.replace('/(tab)');
-            }
-          } catch (parseError) {
-            console.log('[OAuth] Error parsing redirect URL:', parseError);
-            // Still try to get session - Supabase might have processed it
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-              router.replace('/(tab)');
-            }
-          }
-        } else if (result.type === 'cancel') {
-          // User cancelled the OAuth flow
-          console.log('OAuth cancelled by user');
-        }
+        console.log('[Auth] opening auth url', (data as any).url, 'redirectUri', redirectUri);
+        await openAuthSessionAsync((data as any).url, redirectUri);
       }
       // Supabase listener in root layout will update auth state when complete
     } catch (e: any) {
@@ -288,6 +253,15 @@ export default function SignInScreen() {
       color: colors.primary,
       fontWeight: 'bold',
     },
+    smallButton: {
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderRadius: 8,
+    },
+    smallButtonText: {
+      fontWeight: '600',
+      fontSize: 13,
+    },
   });
 
   const [emailFocused, setEmailFocused] = useState(false);
@@ -379,6 +353,18 @@ export default function SignInScreen() {
       >
               <Ionicons name="logo-google" size={24} color={colors.foreground} />
               <Text style={styles.googleButtonText}>Sign in with Google</Text>
+          </TouchableOpacity>
+
+          <Text style={{ marginTop: 8, color: colors.mutedForeground, fontSize: 12 }}>Redirect URI: {redirectUri}</Text>
+
+          <TouchableOpacity style={[styles.smallButton, { marginTop: 10 }]} onPress={async () => {
+            try {
+              await Linking.openURL(redirectUri);
+            } catch (e) {
+              Alert.alert('Open Link Failed', String(e));
+            }
+          }}>
+            <Text style={[styles.smallButtonText, { color: colors.primary }]}>Test deep link (open app)</Text>
           </TouchableOpacity>
 
           <View style={styles.footerContainer}>

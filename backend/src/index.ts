@@ -33,17 +33,55 @@ app.use(express.urlencoded({ extended: true, limit: "200mb" }));
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow mobile apps, Postman, server-to-server
-      if (!origin) return callback(null, true);
-
-      // Allow configured frontend origin if present
-      const allowedOrigins = [Env.FRONTEND_ORIGIN];
-
-      if (allowedOrigins.includes(origin)) {
+      // Allow mobile apps, Postman, server-to-server (no origin)
+      if (!origin) {
+        console.log('[CORS] Allowing request without origin (mobile app/server)');
         return callback(null, true);
       }
 
-      return callback(new Error("Not allowed by CORS"));
+      // Build allowed origins list
+      const allowedOrigins: (string | RegExp)[] = [
+        Env.FRONTEND_ORIGIN,
+        // Render frontend URL (if deployed separately) - add your Render frontend URL here if you have one
+        'https://chat-app-qwrr.onrender.com', // Render backend URL (for same-origin requests)
+        // Allow localhost for development (web frontend)
+        'http://localhost:8081',
+        'http://localhost:19006',
+        'http://127.0.0.1:8081',
+        'http://127.0.0.1:19006',
+        // Allow any localhost port for Expo web (development only)
+        ...(Env.NODE_ENV === 'development' ? [
+          /^http:\/\/localhost:\d+$/,
+          /^http:\/\/127\.0\.0\.1:\d+$/,
+        ] : []),
+      ];
+
+      // Check exact matches first
+      if (allowedOrigins.includes(origin)) {
+        console.log('[CORS] Allowing origin:', origin);
+        return callback(null, true);
+      }
+
+      // Check regex patterns in development
+      if (Env.NODE_ENV === 'development') {
+        for (const pattern of allowedOrigins) {
+          if (pattern instanceof RegExp && pattern.test(origin)) {
+            console.log('[CORS] Allowing origin (regex match):', origin);
+            return callback(null, true);
+          }
+        }
+      }
+
+      // In production, be more permissive for Render deployments
+      // Allow any HTTPS origin from render.com subdomain
+      if (Env.NODE_ENV === 'production' && origin.includes('render.com')) {
+        console.log('[CORS] Allowing Render origin:', origin);
+        return callback(null, true);
+      }
+
+      console.warn('[CORS] Blocked origin:', origin);
+      console.log('[CORS] Allowed origins:', allowedOrigins.filter(o => typeof o === 'string'));
+      return callback(new Error(`Not allowed by CORS: ${origin}`));
     },
     credentials: true,
   })
@@ -97,7 +135,26 @@ app.get(
   })
 );
 
+// Log all API requests for debugging
+app.use("/api", (req, res, next) => {
+  console.log(`[API Request] ${req.method} ${req.path}`, {
+    origin: req.headers.origin,
+    'user-agent': req.headers['user-agent'],
+  });
+  next();
+});
+
 app.use("/api", routes);
+
+// 404 handler for API routes
+app.use("/api/*", (req: Request, res: Response) => {
+  console.warn(`[404] API route not found: ${req.method} ${req.path}`);
+  res.status(HTTPSTATUS.NOT_FOUND).json({
+    message: "API route not found",
+    path: req.path,
+    method: req.method,
+  });
+});
 
 // Legal: Privacy Policy (HTML)
 app.get(

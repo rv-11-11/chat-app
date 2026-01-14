@@ -35,6 +35,7 @@ export const connectSocket = (): Socket => {
     auth: {},
   };
 
+  console.log('[Socket Client] Connecting to:', ENV.SOCKET_URL);
   socket = io(ENV.SOCKET_URL, options);
 
   // Attach basic listeners immediately

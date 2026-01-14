@@ -1,15 +1,11 @@
 import * as WebBrowser from 'expo-web-browser';
+import * as AuthSession from 'expo-auth-session';
 import * as SecureStore from 'expo-secure-store';
-import Constants from 'expo-constants';
+import { Alert, Platform } from 'react-native';
 import { createClient, SupabaseClient, Session } from '@supabase/supabase-js';
 
-const getEnvVar = (key: string, defaultValue: string = ''): string => {
-  const value = Constants.expoConfig?.extra?.[key];
-  return value || defaultValue;
-};
-
-const SUPABASE_URL = getEnvVar('EXPO_PUBLIC_SUPABASE_URL', 'https://elcfjdfiiucahgmwtibh.supabase.co');
-const SUPABASE_ANON_KEY = getEnvVar('EXPO_PUBLIC_SUPABASE_ANON_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsY2ZqZGZpaXVjYWhnbXd0aWJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc1MjMzMzYsImV4cCI6MjA4MzA5OTMzNn0.HIdfaqTfWoIxC0_f4b6Kecd9h1t6E9MnAdkj4MNtAPA');
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
 // Choose storage adapter depending on environment: localStorage for web, SecureStore for native
 const isWeb = typeof window !== 'undefined' && typeof window.document !== 'undefined';
@@ -18,7 +14,7 @@ const localStorageAdapter = {
   async getItem(key: string) {
     try {
       return Promise.resolve(window.localStorage.getItem(key));
-    } catch {
+    } catch (e) {
       return null;
     }
   },
@@ -26,7 +22,7 @@ const localStorageAdapter = {
     try {
       window.localStorage.setItem(key, value);
       return Promise.resolve();
-    } catch {
+    } catch (e) {
       return null;
     }
   },
@@ -34,7 +30,7 @@ const localStorageAdapter = {
     try {
       window.localStorage.removeItem(key);
       return Promise.resolve();
-    } catch {
+    } catch (e) {
       return null;
     }
   },
@@ -78,6 +74,55 @@ export const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON
 export const openAuthSessionAsync = async (authUrl: string, redirectUri: string) => {
   try {
     const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
+
+    // On native, Expo's WebBrowser returns a url with tokens after OAuth flow.
+    // Parse that url and set the Supabase session so the client has the proper credentials.
+    try {
+      if (result && (result as any).type === 'success' && (result as any).url) {
+        const returnedUrl: string = (result as any).url;
+        // Extract fragment (#...) or query (?...) params
+        let paramsString = '';
+        try {
+          const u = new URL(returnedUrl);
+          paramsString = u.hash || u.search || '';
+        } catch (e) {
+          // Fallback: try to split after '#' or '?'
+          const hashIndex = returnedUrl.indexOf('#');
+          const qIndex = returnedUrl.indexOf('?');
+          if (hashIndex >= 0) paramsString = returnedUrl.slice(hashIndex);
+          else if (qIndex >= 0) paramsString = returnedUrl.slice(qIndex);
+        }
+
+        if (paramsString.startsWith('#') || paramsString.startsWith('?')) {
+          const search = paramsString.startsWith('#') ? paramsString.slice(1) : paramsString.slice(1);
+          const parsed = new URLSearchParams(search);
+          const access_token = parsed.get('access_token');
+          const refresh_token = parsed.get('refresh_token');
+          if (access_token) {
+            // set session into supabase client storage
+            try {
+              console.log('[Supabase] native flow setSession from returned url');
+              await (supabase.auth as any).setSession({
+                access_token: access_token,
+                refresh_token: (refresh_token || undefined) as any,
+              });
+            } catch (err) {
+              console.log('[Supabase] native setSession failed', err);
+              // show in-app alert on native so user can see failure during APK testing
+              try {
+                if (Platform.OS !== 'web') {
+                  Alert.alert('Authentication Error', 'Failed to finish Google sign-in. Please try again or check redirect URI settings.');
+                }
+              } catch {}
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore parsing errors
+      console.log('[Supabase] openAuthSessionAsync parse error');
+    }
+
     return result;
   } catch (e) {
     throw e;

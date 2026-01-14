@@ -1,0 +1,77 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Supabase OAuth Redirect Helper</title>
+    <style>
+      /* Allow text selection on desktop and mobile; enable dragging for the link */
+      body { font-family: system-ui, -apple-system, Roboto, 'Segoe UI', sans-serif; padding: 24px; -webkit-user-select: text; user-select: text; }
+      pre { background:#f6f8fa; padding:12px; border-radius:8px; overflow:auto; -webkit-user-select: text; user-select: text; -webkit-touch-callout: text; }
+      .btn { display:inline-block; padding:10px 14px; border-radius:8px; background:#2563eb; color:#fff; text-decoration:none }
+      /* Make the link visually draggable on some browsers and allow selection inside it */
+      .btn, .btn * { -webkit-user-drag: element; -webkit-user-select: text; user-select: text; }
+    </style>
+  </head>
+  <body>
+    <h2>Supabase OAuth Redirect Helper</h2>
+    <p>This page captures the OAuth callback (query and hash) and forwards to the app scheme with the fragment so your app can receive tokens.</p>
+
+    <h3>Incoming parts</h3>
+    <div>
+      <strong>Location.href:</strong>
+      <pre id="href">(loading...)</pre>
+    </div>
+    <div>
+      <strong>Search (query):</strong>
+      <pre id="search">(loading...)</pre>
+    </div>
+    <div>
+      <strong>Hash (fragment):</strong>
+      <pre id="hash">(loading...)</pre>
+    </div>
+
+    <p>
+      <!-- Make draggable so users can drag the deep link to another app or desktop — drag carries the URL. -->
+      <a id="openApp" class="btn" href="#" draggable="true" role="button" aria-label="Open app (forward)">Open app (forward)</a>
+    </p>
+
+    <script>
+      const href = window.location.href;
+      const search = window.location.search || '';
+      const hash = window.location.hash || '';
+      document.getElementById('href').textContent = href;
+      document.getElementById('search').textContent = search;
+      document.getElementById('hash').textContent = hash;
+
+      // Determine fragment to forward: prefer hash, else use query
+      let fragment = '';
+      if (hash && hash.length > 1) fragment = hash.slice(1);
+      else if (search && search.length > 1) fragment = search.slice(1);
+
+      const appUrl = 'linkiplay://auth/callback' + (fragment ? ('#' + fragment) : '');
+      const openApp = document.getElementById('openApp');
+      openApp.href = appUrl;
+      openApp.textContent = fragment ? 'Open app (forward tokens)' : 'Open app (no tokens found)';
+
+      // Add drag support: when the link is dragged, attach the deep-link URL to the drag payload
+      openApp.addEventListener('dragstart', (ev) => {
+        try {
+          ev.dataTransfer.setData('text/plain', appUrl);
+        } catch (e) {
+          // some browsers may restrict setting drag data — ignore silently
+        }
+      });
+
+      // Also allow click/tap to open immediately
+      openApp.addEventListener('click', (e) => {
+        // default navigation will work; prevent default if you prefer programmatic open
+      });
+
+      // Try auto-forward after 2s if a fragment exists
+      if (fragment) {
+        setTimeout(() => { window.location.href = appUrl; }, 2000);
+      }
+    </script>
+  </body>
+</html>
